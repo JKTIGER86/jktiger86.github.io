@@ -1,0 +1,17 @@
+{
+  "name": "경호 업무 비서",
+  "short_name": "업무 비서",
+  "description": "반복되는 엑셀 일을 버튼 몇 번으로 끝내는 경호의 업무 도구",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#12151b",
+  "theme_color": "#2f6fed",
+  "lang": "ko",
+  "icons": [
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
