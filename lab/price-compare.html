@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>엑셀 가격 비교</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/owner.js"></script>
+<script src="assets/lock.js"></script>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#ffc531">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="assets/common.js"></script>
+<script src="assets/layout.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>엑셀 가격 비교 💸</h1>
+    <p>이전 행사 리스트와 새로 받은 리스트를 비교해서, 바뀐 가격을 노란색으로 표시해 드려요.</p>
+  </header>
+
+  <div class="panel">
+    <ol class="steps">
+      <li><b>이전 파일</b>(내가 보낸 거)과 <b>새 파일</b>(사장님이 고친 거)을 올려요.</li>
+      <li><b>비교하기</b>를 누르면 바뀐 내용이 아래에 나와요.</li>
+      <li><b>표시된 엑셀 받기</b>를 누르면 새 파일에 노란색 표시 + 메모 + "가격변경내역" 시트가 들어간 파일이 받아져요.</li>
+    </ol>
+    <div class="drops" style="margin-top:16px">
+      <div class="drop" id="dropOld"><b>① 이전 파일</b><small>여기로 끌어다 놓거나 클릭</small><input type="file" accept=".xlsx"></div>
+      <div class="drop" id="dropNew"><b>② 새 파일</b><small>여기로 끌어다 놓거나 클릭</small><input type="file" accept=".xlsx"></div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="run" disabled>비교하기</button>
+      <button id="download" class="hidden">표시된 엑셀 받기</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <div id="result" class="hidden">
+    <div class="stats" id="stats"></div>
+
+    <h2 id="priceTitle">가격이 바뀐 품번</h2>
+    <div class="table-wrap"><table id="priceTable"></table></div>
+
+    <div id="otherBox">
+      <h2>그 밖에 바뀐 것</h2>
+      <div class="table-wrap"><table id="otherTable"></table></div>
+    </div>
+  </div>
+
+  <footer>엑셀 파일은 내 컴퓨터 안에서만 처리돼요 · made by 경호 &amp; 루나</footer>
+</div>
+
+<script>
+let oldFile = null, newFile = null, outWb = null;
+const $ = id => document.getElementById(id);
+const runBtn = $('run'), dlBtn = $('download'), msg = $('msg');
+
+Biseo.dropZone($('dropOld'), f => { oldFile = f; ready(); });
+Biseo.dropZone($('dropNew'), f => { newFile = f; ready(); });
+function ready() { runBtn.disabled = !(oldFile && newFile); dlBtn.classList.add('hidden'); }
+
+runBtn.addEventListener('click', async () => {
+  runBtn.disabled = true;
+  Biseo.message(msg, '비교하는 중이에요… 잠시만요!', 'ok');
+  try {
+    const [oldWb, newWb] = await Promise.all([Biseo.readFile(oldFile), Biseo.readFile(newFile)]);
+    const res = compare(oldWb, newWb);
+    outWb = newWb;
+    show(res);
+    Biseo.message(msg, res.prices.length
+      ? `다 됐어요! 가격이 바뀐 품번이 ${res.prices.length}개 있어요.`
+      : '다 됐어요! 바뀐 가격은 없어요 😊', 'ok');
+    dlBtn.classList.remove('hidden');
+  } catch (e) {
+    console.error(e);
+    Biseo.message(msg, '파일을 읽다가 문제가 생겼어요: ' + e.message, 'err');
+  }
+  runBtn.disabled = false;
+});
+
+dlBtn.addEventListener('click', async () => {
+  if (!outWb) return;
+  dlBtn.disabled = true;
+  try { await Biseo.save(outWb, Biseo.baseName(newFile.name) + '_가격변경표시.xlsx'); }
+  catch (e) { Biseo.message(msg, '저장하다가 문제가 생겼어요: ' + e.message, 'err'); }
+  dlBtn.disabled = false;
+});
+
+function compare(oldWb, newWb) {
+  const oldWs = oldWb.worksheets[0], newWs = newWb.worksheets[0];
+  const oldItems = Biseo.parseList(oldWs), newItems = Biseo.parseList(newWs);
+  if (!newItems.length) throw new Error('새 파일에서 "MODEL" 머리글 아래 품번을 못 찾았어요.');
+  const oldMap = Biseo.byModel(oldItems), newMap = Biseo.byModel(newItems);
+
+  const prices = [], others = [];
+  let oldSum = 0, newSum = 0;
+  for (const it of newItems) {
+    const o = oldMap.get(it.model);
+    if (!o) continue;
+    if (o.price !== it.price) {
+      const diff = (it.price ?? 0) - (o.price ?? 0);
+      prices.push({ ...it, before: o.price, after: it.price, diff });
+      const row = newWs.getRow(it.row);
+      const note = `변경 전: ${Biseo.won(o.price)}원 → 변경 후: ${Biseo.won(it.price)}원 (${diff > 0 ? '+' : ''}${Biseo.won(diff)}원)`;
+      Biseo.mark(row.getCell(it.cols.price), note);
+      if (it.cols.ext > 0) Biseo.mark(row.getCell(it.cols.ext));
+      Biseo.shade(row.getCell(it.cols.model));
+    }
+    if (o.total !== it.total) {
+      others.push({ kind: '수량 변경', brand: it.brand, model: it.model, row: it.row, detail: `${o.total ?? 0} → ${it.total ?? 0}` });
+      if (it.cols.total > 0) Biseo.mark(newWs.getRow(it.row).getCell(it.cols.total), `변경 전 수량: ${o.total ?? 0}`);
+    }
+  }
+  for (const it of newItems) if (!oldMap.has(it.model)) {
+    others.push({ kind: '새로 추가', brand: it.brand, model: it.model, row: it.row, detail: `행사가 ${Biseo.won(it.price)}원` });
+    Biseo.shade(newWs.getRow(it.row).getCell(it.cols.model));
+  }
+  for (const it of oldItems) if (!newMap.has(it.model)) {
+    others.push({ kind: '빠짐', brand: it.brand, model: it.model, row: null, detail: `이전 행사가 ${Biseo.won(it.price)}원` });
+  }
+  for (const it of oldItems) oldSum += (it.ext ?? (it.price ?? 0) * (it.total ?? 0));
+  for (const it of newItems) newSum += (it.ext ?? (it.price ?? 0) * (it.total ?? 0));
+
+  // 가격변경내역 시트
+  const ws = Biseo.freshSheet(newWb, '가격변경내역');
+  Biseo.styleTable(ws, ['행', '브랜드', '모델', '변경 전 가격', '변경 후 가격', '차이'], [6, 16, 60, 14, 14, 12], [4, 5, 6]);
+  for (const p of prices) ws.addRow([p.row, p.brand, p.model, p.before, p.after, p.diff]);
+  if (!prices.length) ws.addRow(['', '', '바뀐 가격이 없어요']);
+  if (others.length) {
+    ws.addRow([]);
+    const h = ws.addRow(['행', '브랜드', '모델', '구분', '내용']);
+    h.font = { bold: true };
+    for (const o of others) ws.addRow([o.row ?? '', o.brand, o.model, o.kind, o.detail]);
+  }
+  ws.addRow([]);
+  const s = ws.addRow(['', '', '전체 금액(EXTENDED PRICE 합)', oldSum, newSum, newSum - oldSum]);
+  s.font = { bold: true };
+
+  return { prices, others, oldSum, newSum, count: newItems.length };
+}
+
+function show(res) {
+  $('result').classList.remove('hidden');
+  const diff = res.newSum - res.oldSum;
+  $('stats').innerHTML = [
+    ['전체 품번', res.count + '개'],
+    ['가격 바뀐 품번', res.prices.length + '개'],
+    ['이전 전체 금액', Biseo.won(res.oldSum) + '원'],
+    ['새 전체 금액', Biseo.won(res.newSum) + '원'],
+    ['차이', `<span class="${diff < 0 ? 'down' : diff > 0 ? 'up' : ''}">${diff > 0 ? '+' : ''}${Biseo.won(diff)}원</span>`],
+  ].map(([k, v]) => `<div class="stat"><span>${k}</span><b>${v}</b></div>`).join('');
+
+  $('priceTable').innerHTML = '<tr><th>브랜드</th><th>모델</th><th class="num">변경 전</th><th class="num">변경 후</th><th class="num">차이</th></tr>' +
+    (res.prices.length ? res.prices.map(p => `<tr><td>${Biseo.esc(p.brand)}</td><td>${Biseo.esc(p.model)}</td>
+      <td class="num">${Biseo.won(p.before)}</td><td class="num">${Biseo.won(p.after)}</td>
+      <td class="num ${p.diff < 0 ? 'down' : 'up'}">${p.diff > 0 ? '+' : ''}${Biseo.won(p.diff)}</td></tr>`).join('')
+      : '<tr><td colspan="5">바뀐 가격이 없어요 😊</td></tr>');
+
+  $('otherBox').classList.toggle('hidden', !res.others.length);
+  $('otherTable').innerHTML = '<tr><th>구분</th><th>브랜드</th><th>모델</th><th>내용</th></tr>' +
+    res.others.map(o => `<tr><td>${o.kind}</td><td>${Biseo.esc(o.brand)}</td><td>${Biseo.esc(o.model)}</td><td>${Biseo.esc(o.detail)}</td></tr>`).join('');
+}
+</script>
+</body>
+</html>
