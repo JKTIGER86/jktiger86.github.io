@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>대표 품번 모으기</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/lock.js"></script>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#ffc531">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="assets/common.js"></script>
+<script src="assets/layout.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>대표 품번 모으기 ⭐</h1>
+    <p>"대표"라고 적힌 품번만 위에서부터 순서대로 모아서 1, 2, 3… 번호를 붙여 드려요.</p>
+  </header>
+
+  <div class="panel">
+    <ol class="steps">
+      <li>행사 리스트 엑셀을 올려요.</li>
+      <li><b>모으기</b>를 누르면 대표 품번 목록이 아래에 나와요.</li>
+      <li><b>엑셀 받기</b>를 누르면 두 번째 시트에 "대표" 목록이 들어간 파일이 받아져요. (사진 폴더 이름도 같이 적혀 있어요)</li>
+    </ol>
+    <div class="drops" style="margin-top:16px">
+      <div class="drop" id="drop"><b>행사 리스트</b><small>여기로 끌어다 놓거나 클릭</small><input type="file" accept=".xlsx"></div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="run" disabled>모으기</button>
+      <button id="download" class="hidden">엑셀 받기</button>
+      <button id="copy" class="hidden">폴더 이름 복사</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <div id="result" class="hidden">
+    <div class="stats" id="stats"></div>
+    <h2>대표 목록</h2>
+    <div class="table-wrap"><table id="table"></table></div>
+  </div>
+
+  <footer>엑셀 파일은 내 컴퓨터 안에서만 처리돼요 · made by 경호 &amp; 루나</footer>
+</div>
+
+<script>
+let file = null, outWb = null, reps = [];
+const $ = id => document.getElementById(id);
+const runBtn = $('run'), dlBtn = $('download'), copyBtn = $('copy'), msg = $('msg');
+
+Biseo.dropZone($('drop'), f => { file = f; runBtn.disabled = false; dlBtn.classList.add('hidden'); copyBtn.classList.add('hidden'); });
+
+// 사진 폴더 이름: "01. 모델명" (폴더 이름에 못 쓰는 / \ : * ? " < > | 는 _ 로)
+const folderName = (i, model, digits) => String(i).padStart(digits, '0') + '. ' + model.replace(/[\/\\:*?"<>|]/g, '_');
+
+runBtn.addEventListener('click', async () => {
+  runBtn.disabled = true;
+  Biseo.message(msg, '모으는 중이에요…', 'ok');
+  try {
+    const wb = await Biseo.readFile(file);
+    const items = Biseo.parseList(wb.worksheets[0]);
+    if (!items.length) throw new Error('"MODEL" 머리글 아래 품번을 못 찾았어요.');
+    const list = items.filter(it => it.marker === '대표');
+    const digits = Math.max(2, String(list.length).length);
+    reps = list.map((it, i) => ({ ...it, no: i + 1, folder: folderName(i + 1, it.model, digits) }));
+
+    const ws = Biseo.freshSheet(wb, '대표', true);
+    Biseo.styleTable(ws, ['순번', '브랜드', '비고', '모델', 'TOTAL', '행사가', '사진폴더'], [6, 16, 8, 60, 8, 12, 64], [6]);
+    ws.getColumn(1).alignment = { horizontal: 'center' };
+    for (const r of reps) ws.addRow([r.no, r.brand, r.note, r.model, r.total, r.price, r.folder]);
+    Biseo.borderAll(ws);
+    outWb = wb;
+
+    show();
+    Biseo.message(msg, reps.length ? `다 됐어요! 대표 품번이 ${reps.length}개예요.` : '"대표"라고 적힌 품번이 없어요. C열에 "대표"가 적혀 있는지 확인해 주세요.', reps.length ? 'ok' : 'err');
+    if (reps.length) { dlBtn.classList.remove('hidden'); copyBtn.classList.remove('hidden'); }
+  } catch (e) {
+    console.error(e);
+    Biseo.message(msg, '파일을 읽다가 문제가 생겼어요: ' + e.message, 'err');
+  }
+  runBtn.disabled = false;
+});
+
+dlBtn.addEventListener('click', async () => {
+  dlBtn.disabled = true;
+  try { await Biseo.save(outWb, Biseo.baseName(file.name) + '_대표.xlsx'); }
+  catch (e) { Biseo.message(msg, '저장하다가 문제가 생겼어요: ' + e.message, 'err'); }
+  dlBtn.disabled = false;
+});
+
+copyBtn.addEventListener('click', async () => {
+  const text = reps.map(r => r.folder).join('\n');
+  try { await navigator.clipboard.writeText(text); Biseo.message(msg, '폴더 이름을 복사했어요! 메모장이나 엑셀에 붙여넣기 하시면 돼요.', 'ok'); }
+  catch { Biseo.message(msg, '복사가 안 됐어요. 표에서 직접 드래그해서 복사해 주세요.', 'err'); }
+});
+
+function show() {
+  $('result').classList.remove('hidden');
+  const brands = new Map();
+  reps.forEach(r => brands.set(r.brand, (brands.get(r.brand) || 0) + 1));
+  $('stats').innerHTML = [['대표 품번', reps.length + '개'], ['브랜드', brands.size + '개']]
+    .concat([...brands].map(([b, n]) => [b, n + '개']))
+    .map(([k, v]) => `<div class="stat"><span>${Biseo.esc(k)}</span><b>${v}</b></div>`).join('');
+  $('table').innerHTML = '<tr><th class="num">순번</th><th>브랜드</th><th>비고</th><th>모델</th><th class="num">TOTAL</th><th class="num">행사가</th><th>사진폴더</th></tr>' +
+    reps.map(r => `<tr><td class="num">${r.no}</td><td>${Biseo.esc(r.brand)}</td><td>${Biseo.esc(r.note)}</td><td>${Biseo.esc(r.model)}</td>
+      <td class="num">${r.total ?? ''}</td><td class="num">${Biseo.won(r.price)}</td><td>${Biseo.esc(r.folder)}</td></tr>`).join('');
+}
+</script>
+</body>
+</html>
