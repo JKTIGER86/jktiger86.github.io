@@ -75,6 +75,7 @@ const Store = {
             <div class="search-results hidden"></div>
           </div>
           <button class="help-btn" type="button">📖 <span>사용법</span></button>
+          <button class="icon-btn" type="button" aria-label="잠그기" title="지금 잠그기" data-act="lock">🔒</button>
           <div class="profile">
             <img src="assets/icons/favicon-32.png" alt="">
             <div><b>경호</b><small>JKTiger</small></div>
@@ -83,13 +84,14 @@ const Store = {
         <main class="content"></main>
       </div>`;
     const content = app.querySelector('.content');
-    kids.forEach(n => { if (n.nodeName !== 'SCRIPT') content.appendChild(n); });
+    kids.forEach(n => { if (n.nodeName !== 'SCRIPT' && n.id !== 'lockScreen') content.appendChild(n); });
     body.prepend(app);
 
     // 메뉴 (휴대폰)
     app.querySelector('.menu-btn').addEventListener('click', () => body.classList.add('nav-open'));
     app.querySelector('.scrim').addEventListener('click', () => body.classList.remove('nav-open'));
     app.querySelector('[data-act=reload]').addEventListener('click', () => location.reload());
+    app.querySelector('[data-act=lock]').addEventListener('click', () => { if (window.Lock) Lock.lock(); });
 
     // 검색
     const input = app.querySelector('.search input');
@@ -130,11 +132,15 @@ const Store = {
           <li>엑셀은 <b>끌어다 놓기</b>나 <b>클릭</b>으로 올려요. 파일은 내 컴퓨터 안에서만 처리되고 밖으로 나가지 않아요.</li>
           <li>위쪽 검색창은 <b>/</b> 키로 바로 열 수 있어요.</li>
           <li>대시보드의 할일·일정·메모·링크는 <b>이 컴퓨터의 크롬</b>에 저장돼요.</li>
+          <li>🔒 <b>1분</b> 동안 쓰지 않으면 자동으로 잠겨요. 위쪽 🔒 버튼으로 바로 잠글 수도 있어요.</li>
           <li>새 도구가 필요하면 루나한테 말해 주세요! 🐯</li>
         </ul>
-        <div class="actions"><button class="primary" type="button">알겠어요</button></div>
+        <div class="actions"><button type="button" data-act="pw">🔑 비밀번호 바꾸기</button><button class="primary" type="button">알겠어요</button></div>
       </div>`;
-      bg.addEventListener('click', e => { if (e.target === bg || e.target.tagName === 'BUTTON') bg.remove(); });
+      bg.addEventListener('click', e => {
+        if (e.target.dataset.act === 'pw') { bg.remove(); if (window.Lock) Lock.changePassword(); return; }
+        if (e.target === bg || e.target.tagName === 'BUTTON') bg.remove();
+      });
       document.body.appendChild(bg);
     });
   }
