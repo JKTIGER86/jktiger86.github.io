@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>브랜드별 모델 수</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="assets/common.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="home-link" href="index.html">← 경호 업무 비서 <span>홈</span></a></div>
+  <header>
+    <h1>브랜드별 모델 수 📊</h1>
+    <p>행사 리스트를 올리면 브랜드마다 모델 수, 대표 수, 수량, 금액을 한 번에 세어 드려요.</p>
+  </header>
+
+  <div class="panel">
+    <ol class="steps">
+      <li>행사 리스트 엑셀을 올려요.</li>
+      <li><b>세어보기</b>를 누르면 브랜드별 표가 나와요.</li>
+      <li>필요하면 <b>표 복사</b>로 카톡이나 엑셀에 붙여넣고, <b>엑셀 받기</b>로 "브랜드별 모델 수" 시트가 들어간 파일을 받아요.</li>
+    </ol>
+    <div class="drops" style="margin-top:16px">
+      <div class="drop" id="drop"><b>행사 리스트</b><small>여기로 끌어다 놓거나 클릭</small><input type="file" accept=".xlsx"></div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="run" disabled>세어보기</button>
+      <button id="copy" class="hidden">표 복사</button>
+      <button id="download" class="hidden">엑셀 받기</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <div id="result" class="hidden">
+    <div class="stats" id="stats"></div>
+    <h2>브랜드별 정리</h2>
+    <div class="table-wrap"><table id="table"></table></div>
+  </div>
+
+  <footer>엑셀 파일은 내 컴퓨터 안에서만 처리돼요 · made by 경호 &amp; 루나</footer>
+</div>
+
+<script>
+let file = null, outWb = null, rows = [], sum = null;
+const $ = id => document.getElementById(id);
+const runBtn = $('run'), dlBtn = $('download'), copyBtn = $('copy'), msg = $('msg');
+
+Biseo.dropZone($('drop'), f => { file = f; runBtn.disabled = false; dlBtn.classList.add('hidden'); copyBtn.classList.add('hidden'); });
+
+runBtn.addEventListener('click', async () => {
+  runBtn.disabled = true;
+  try {
+    const wb = await Biseo.readFile(file);
+    const items = Biseo.parseList(wb.worksheets[0]);
+    if (!items.length) throw new Error('"MODEL" 머리글 아래 품번을 못 찾았어요.');
+
+    const map = new Map();
+    for (const it of items) {
+      const b = it.brand || '(브랜드 없음)';
+      if (!map.has(b)) map.set(b, { brand: b, models: 0, reps: 0, qty: 0, amount: 0 });
+      const g = map.get(b);
+      g.models++;
+      if (it.marker === '대표') g.reps++;
+      g.qty += it.total ?? 0;
+      g.amount += it.ext ?? (it.price ?? 0) * (it.total ?? 0);
+    }
+    rows = [...map.values()];
+    sum = rows.reduce((s, r) => ({ brand: '합계', models: s.models + r.models, reps: s.reps + r.reps, qty: s.qty + r.qty, amount: s.amount + r.amount }),
+      { brand: '합계', models: 0, reps: 0, qty: 0, amount: 0 });
+
+    const ws = Biseo.freshSheet(wb, '브랜드별 모델 수');
+    Biseo.styleTable(ws, ['브랜드', '모델 수', '대표 수', '총 수량', '총 금액'], [20, 10, 10, 10, 16], [4, 5]);
+    rows.forEach(r => ws.addRow([r.brand, r.models, r.reps, r.qty, r.amount]));
+    ws.addRow([sum.brand, sum.models, sum.reps, sum.qty, sum.amount]).font = { bold: true };
+    Biseo.borderAll(ws);
+    outWb = wb;
+
+    show();
+    Biseo.message(msg, `다 됐어요! 브랜드 ${rows.length}개, 모델 ${sum.models}개예요.`, 'ok');
+    dlBtn.classList.remove('hidden'); copyBtn.classList.remove('hidden');
+  } catch (e) {
+    console.error(e);
+    Biseo.message(msg, '파일을 읽다가 문제가 생겼어요: ' + e.message, 'err');
+  }
+  runBtn.disabled = false;
+});
+
+dlBtn.addEventListener('click', async () => {
+  dlBtn.disabled = true;
+  try { await Biseo.save(outWb, Biseo.baseName(file.name) + '_브랜드별.xlsx'); }
+  catch (e) { Biseo.message(msg, '저장하다가 문제가 생겼어요: ' + e.message, 'err'); }
+  dlBtn.disabled = false;
+});
+
+copyBtn.addEventListener('click', async () => {
+  // 탭으로 구분하면 엑셀에 붙여넣을 때 칸이 나뉘어요
+  const text = ['브랜드\t모델 수\t대표 수\t총 수량\t총 금액']
+    .concat([...rows, sum].map(r => [r.brand, r.models, r.reps, r.qty, Biseo.won(r.amount)].join('\t'))).join('\n');
+  try { await navigator.clipboard.writeText(text); Biseo.message(msg, '표를 복사했어요! 엑셀이나 카톡에 붙여넣기 하시면 돼요.', 'ok'); }
+  catch { Biseo.message(msg, '복사가 안 됐어요. 표를 직접 드래그해서 복사해 주세요.', 'err'); }
+});
+
+function show() {
+  $('result').classList.remove('hidden');
+  $('stats').innerHTML = [['브랜드', rows.length + '개'], ['모델', sum.models + '개'], ['대표', sum.reps + '개'], ['총 수량', sum.qty.toLocaleString('ko-KR')], ['총 금액', Biseo.won(sum.amount) + '원']]
+    .map(([k, v]) => `<div class="stat"><span>${k}</span><b>${v}</b></div>`).join('');
+  const tr = (r, cls = '') => `<tr class="${cls}"><td>${Biseo.esc(r.brand)}</td><td class="num">${r.models}</td><td class="num">${r.reps}</td>
+    <td class="num">${r.qty.toLocaleString('ko-KR')}</td><td class="num">${Biseo.won(r.amount)}</td></tr>`;
+  $('table').innerHTML = '<tr><th>브랜드</th><th class="num">모델 수</th><th class="num">대표 수</th><th class="num">총 수량</th><th class="num">총 금액</th></tr>' +
+    rows.map(r => tr(r)).join('') + tr(sum, 'sum');
+}
+</script>
+</body>
+</html>

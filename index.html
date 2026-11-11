@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>경호 업무 비서</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>경호 업무 비서 🐯</h1>
+      <p>반복되는 엑셀 일을 여기서 버튼 몇 번으로 끝내요.</p>
+      <span class="today" id="today"></span>
+    </header>
+
+    <h2>지금 쓸 수 있어요</h2>
+    <div class="grid">
+      <a class="card" href="price-compare.html">
+        <span class="tag ready">사용가능</span>
+        <h3>엑셀 가격 비교 💸</h3>
+        <p>이전 파일과 새 파일을 올리면 바뀐 가격을 노란색으로 표시하고 변경내역 시트를 만들어 줘요.</p>
+      </a>
+      <a class="card" href="rep-list.html">
+        <span class="tag ready">사용가능</span>
+        <h3>대표 품번 모으기 ⭐</h3>
+        <p>"대표"라고 적힌 품번만 순서대로 모아서 번호와 사진 폴더 이름까지 붙여 줘요.</p>
+      </a>
+      <a class="card" href="brand-count.html">
+        <span class="tag ready">사용가능</span>
+        <h3>브랜드별 모델 수 📊</h3>
+        <p>행사 리스트를 올리면 브랜드별 모델 수·대표 수·수량·금액을 세어 줘요.</p>
+      </a>
+    </div>
+
+    <h2>만들 예정</h2>
+    <div class="grid">
+      <div class="card">
+        <span class="tag">준비중</span>
+        <h3>재고추가 양식 변환</h3>
+        <p>받은 재고 엑셀을 우리 양식으로 바꿔 줘요.</p>
+      </div>
+    </div>
+
+    <footer>엑셀 파일은 내 컴퓨터 안에서만 처리돼요 · made by 경호 &amp; 루나</footer>
+  </div>
+<script>
+  const d = new Date();
+  const days = ['일','월','화','수','목','금','토'];
+  document.getElementById('today').textContent =
+    `오늘은 ${d.getMonth()+1}월 ${d.getDate()}일 (${days[d.getDay()]}) · 오늘도 화이팅!`;
+</script>
+</body>
+</html>
