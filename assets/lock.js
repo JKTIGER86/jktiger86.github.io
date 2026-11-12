@@ -2,7 +2,7 @@
  * - 주인(경호님) 비밀번호 하나로만 열려요. 비밀번호 자체는 어디에도 저장하지 않고,
  *   알아볼 수 없게 바꾼 값(PBKDF2-SHA256)만 assets/owner.js 에 등록돼요.
  * - 아직 등록 전이면: 비밀번호를 만들고 "등록 코드"를 받아서 루나에게 전달해요.
- * - 앱을 새로 켤 때마다, 그리고 1분 동안 아무것도 안 하면 잠겨요.
+ * - 앱을 새로 켤 때마다, 그리고 컴퓨터를 1분 동안 안 쓰면 잠겨요(아래 자리비움 감지 참고).
  * - 잠겨도 화면 뒤의 작업 내용은 그대로 남아 있어요.
  * 이 파일은 <head> 에서 owner.js 바로 다음에 불러와야 화면이 잠깐이라도 보이지 않아요.
  */
@@ -50,6 +50,7 @@ const Lock = (() => {
   /* ── 열기 / 잠그기 ── */
   function open() {
     ss.set({ open: true, last: Date.now() });
+    if (sysIdle === 'idle') sysIdle = 'active';   // 방금 비밀번호를 쳤으니 사용 중이에요
     html.classList.remove('locked');
     const scr = document.getElementById('lockScreen');
     if (scr) scr.remove();
@@ -69,8 +70,45 @@ const Lock = (() => {
   }
   ['mousemove', 'mousedown', 'keydown', 'wheel', 'touchstart', 'scroll'].forEach(t =>
     addEventListener(t, touch, { passive: true, capture: true }));
-  setInterval(() => { if (!html.classList.contains('locked') && !isOpen()) lock(); }, 3000);
+
+  /* ── 컴퓨터 전체 기준 자리비움 감지 (카톡·네이트온처럼) ──
+   * 크롬/엣지의 Idle Detection 기능으로 "컴퓨터 어디에서든" 마우스·키보드를 1분 동안
+   * 안 쓰면 잠가요. 다른 프로그램을 쓰는 중이면 안 잠겨요.
+   * 처음 한 번 "허용"을 눌러야 하고, 허용 안 하거나 안 되는 브라우저면 예전처럼
+   * 이 앱 안에서 1분 동안 안 쓰면 잠가요. */
+  let sysIdle = null;                 // 'active' | 'idle' | null(사용 안 함)
+  const hasIdleApi = 'IdleDetector' in window;
+  async function startIdle() {
+    if (!hasIdleApi || sysIdle) return;
+    try {
+      const det = new IdleDetector();
+      det.addEventListener('change', () => {
+        sysIdle = det.userState;
+        if (det.userState === 'idle' || det.screenState === 'locked') {
+          if (!html.classList.contains('locked')) lock();
+        } else { lastSave = 0; touch(); }
+      });
+      await det.start({ threshold: IDLE_MS });
+      sysIdle = det.userState || 'active';
+    } catch { sysIdle = null; }
+  }
+  function askIdle() {          // 버튼을 누른 순간(사용자 동작 안)에 불러야 해요
+    if (!hasIdleApi) return;
+    try { IdleDetector.requestPermission().then(s => { if (s === 'granted') startIdle(); }).catch(() => {}); } catch { /* 무시 */ }
+  }
+  if (hasIdleApi && navigator.permissions) {
+    navigator.permissions.query({ name: 'idle-detection' })
+      .then(p => { if (p.state === 'granted') startIdle(); }).catch(() => {});
+  }
+
+  setInterval(() => {
+    if (html.classList.contains('locked')) return;
+    if (sysIdle === 'active') { lastSave = 0; touch(); return; }   // 컴퓨터를 쓰는 중이면 계속 열어 둬요
+    if (sysIdle === 'idle') { lock(); return; }
+    if (!isOpen()) lock();
+  }, 3000);
   document.addEventListener('visibilitychange', () => {
+    if (sysIdle) return;
     if (document.visibilityState === 'visible' && !html.classList.contains('locked') && !isOpen()) lock();
   });
 
@@ -121,7 +159,7 @@ const Lock = (() => {
     scr.className = overlay ? 'lk-over' : '';
     scr.innerHTML = `<div class="lk-card" role="dialog" aria-label="로그인">
       <img class="lk-logo" src="assets/icons/icon-512.png" alt=""><h1>경호 업무 비서</h1>${body}
-      <div class="lk-foot">🔒 1분 동안 쓰지 않으면 자동으로 잠겨요</div></div>`;
+      <div class="lk-foot">🔒 컴퓨터를 1분 동안 쓰지 않으면 자동으로 잠겨요</div></div>`;
 
     const $ = id => scr.querySelector('#' + id);
     const card = scr.querySelector('.lk-card');
@@ -150,6 +188,7 @@ const Lock = (() => {
         const rec = await makeRecord(a);
         show('code', toCode(rec));
       } else if (mode === 'login') {
+        askIdle();
         const st = ss.get();
         const waitLeft = (st.waitUntil || 0) - Date.now();
         if (waitLeft > 0) return err(`너무 많이 틀렸어요. ${Math.ceil(waitLeft / 1000)}초 뒤에 다시 해 주세요.`);
