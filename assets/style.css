@@ -297,6 +297,67 @@ html.locked body { overflow: hidden; }
 @media (max-width: 1080px) {
   .dash { grid-template-columns: 1fr; }
 }
+/* 달력 */
+.cal-head { align-items: center; }
+.cal-head h3 { font-size: 18px; }
+.cal-nav { display: flex; gap: 4px; }
+.cal-nav button { padding: 4px 10px; font-size: 13px; min-width: 32px; }
+.cal-legend { margin-left: 6px; white-space: nowrap; }
+.cal-legend i, .cal-d .dots i, .cal-day li i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; vertical-align: middle; }
+.cal-legend i { margin: 0 3px 0 8px; }
+.lg-s, i.s { background: var(--accent); }
+.lg-t, i.t { background: var(--down); }
+.lg-h, i.h { background: var(--danger); }
+.cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin-top: 12px; }
+.cal-w { text-align: center; font-size: 12px; font-weight: 600; color: var(--sub); padding: 4px 0; }
+.cal-w.sun, .cal-d.sun .n { color: var(--danger); }
+.cal-w.sat, .cal-d.sat .n { color: var(--down); }
+.cal-d {
+  display: flex; flex-direction: column; align-items: stretch; gap: 2px; min-height: 76px; padding: 6px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--card-2); color: var(--text);
+  text-align: left; cursor: pointer; overflow: hidden; font: inherit;
+}
+.cal-d:hover { border-color: var(--accent); }
+.cal-d.out { opacity: .4; }
+.cal-d .n { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cal-d.today .n { background: var(--accent); color: var(--on-accent); border-radius: 999px; width: 24px; height: 24px; display: grid; place-items: center; }
+.cal-d.pick { border: 2px solid var(--accent); padding: 5px; background: var(--accent-soft); }
+.cal-d .ev { font-size: 11px; line-height: 1.35; padding: 1px 5px; border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-d .ev.s { background: var(--accent-soft); color: var(--accent-strong); font-weight: 600; }
+.cal-d .ev.t { background: rgba(47, 111, 237, .12); color: var(--down); }
+.cal-d .ev.h { color: var(--danger); padding-left: 0; }
+.cal-d .ev.done { text-decoration: line-through; opacity: .6; }
+.cal-d .ev.more { color: var(--sub); padding-left: 0; }
+.cal-d .dots { display: none; gap: 3px; }
+.cal-day { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 14px; }
+.cal-day-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.cal-day-head button { margin-left: auto; padding: 6px 12px; font-size: 13px; }
+.cal-day ul { list-style: none; margin: 8px 0 0; padding: 0; }
+.cal-day li { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+.cal-day li small { color: var(--sub); font-size: 11px; width: 40px; flex-shrink: 0; }
+.cal-day li .done { text-decoration: line-through; color: var(--sub); }
+.cal-day .empty-note { margin-top: 6px; }
+@media (max-width: 640px) {
+  .cal-d { min-height: 46px; padding: 5px 3px; align-items: center; }
+  .cal-d.pick { padding: 4px 2px; }
+  .cal-d .ev { display: none; }
+  .cal-d .dots { display: flex; }
+  .cal-legend { display: block; margin: 4px 0 0; }
+  .cal-legend i:first-child { margin-left: 0; }
+}
+
+/* 루나랑 대화 버튼 (오른쪽 아래, 톡톡처럼) */
+.luna-fab {
+  position: fixed; right: 22px; bottom: 22px; z-index: 50;
+  display: flex; align-items: center; gap: 8px; padding: 10px 18px 10px 12px;
+  background: var(--accent); color: var(--on-accent); border-radius: 999px;
+  font-weight: 700; font-size: 15px; text-decoration: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .18); transition: transform .15s, box-shadow .15s;
+}
+.luna-fab:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0, 0, 0, .22); }
+.luna-fab-ico { font-size: 24px; line-height: 1; }
+html.locked .luna-fab { display: none; }
+
 @media (max-width: 860px) {
   .side { position: fixed; left: 0; top: 0; z-index: 60; transform: translateX(-100%); transition: transform .2s; box-shadow: 0 0 40px rgba(0, 0, 0, .3); }
   body.nav-open .side { transform: none; }
@@ -313,4 +374,6 @@ html.locked body { overflow: hidden; }
 @media (max-width: 520px) {
   .help-btn { padding: 0 12px; }
   .help-btn span { display: none; }
+  .luna-fab { right: 16px; bottom: 16px; padding: 12px; }
+  .luna-fab-txt { display: none; }
 }

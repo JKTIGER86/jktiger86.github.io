@@ -39,8 +39,22 @@
       <div class="kv hidden" id="joinRow"><span>입사일</span><b class="row-form"><input type="date" id="joinDate"><button type="button" id="saveJoin" class="primary" style="padding:6px 12px">저장</button></b></div>
     </section>
 
-    <!-- 왼쪽: 할일 + 메모 -->
+    <!-- 왼쪽: 달력 + 할일 + 메모 -->
     <div class="dash-col">
+      <section class="card box">
+        <div class="card-title cal-head">
+          <h3 id="calTitle">달력</h3>
+          <div class="cal-nav">
+            <button type="button" id="calPrev" aria-label="이전 달">‹</button>
+            <button type="button" id="calToday">오늘</button>
+            <button type="button" id="calNext" aria-label="다음 달">›</button>
+          </div>
+        </div>
+        <p class="card-desc">날짜를 누르면 그날 일정을 바로 넣을 수 있어요. <span class="cal-legend"><i class="lg-s"></i>일정 <i class="lg-t"></i>할 일 <i class="lg-h"></i>공휴일</span></p>
+        <div class="cal" id="cal"></div>
+        <div class="cal-day" id="calDay"></div>
+      </section>
+
       <section class="card box">
         <div class="card-title"><h3>오늘의 할일</h3><small id="todoSummary"></small></div>
         <p class="card-desc">할 일을 적고, 끝나면 체크해요.</p>
@@ -122,7 +136,7 @@ $('quick').innerHTML = TOOLS.map(t => t.ready
 /* 할일 */
 let todos = Store.get('todos', []);
 let filter = 'open';
-function saveTodos() { Store.set('todos', todos); renderTodos(); renderSummary(); }
+function saveTodos() { Store.set('todos', todos); renderTodos(); renderSummary(); renderCal(); }
 function renderTodos() {
   const list = todos
     .filter(t => filter === 'all' || (filter === 'done' ? t.done : !t.done))
@@ -163,7 +177,7 @@ $('todoTabs').addEventListener('click', e => {
 
 /* 일정 */
 let scheds = Store.get('schedules', []);
-function saveScheds() { Store.set('schedules', scheds); renderScheds(); renderSummary(); }
+function saveScheds() { Store.set('schedules', scheds); renderScheds(); renderSummary(); renderCal(); }
 function renderScheds() {
   const list = scheds.filter(s => dayDiff(s.date) >= -3).sort((a, b) => a.date < b.date ? -1 : 1);
   $('schedList').innerHTML = list.length ? list.map(s => {
@@ -254,7 +268,73 @@ $('saveJoin').addEventListener('click', () => {
   renderSummary();
 });
 
-renderTodos(); renderScheds(); renderLinks(); renderSummary();
+/* 달력 - 일정·할 일(날짜 있는 것)·공휴일을 한눈에 */
+const HOLI = {
+  '2026-01-01': '신정', '2026-02-16': '설날 연휴', '2026-02-17': '설날', '2026-02-18': '설날 연휴',
+  '2026-03-01': '삼일절', '2026-03-02': '대체공휴일', '2026-05-05': '어린이날', '2026-05-24': '부처님오신날',
+  '2026-05-25': '대체공휴일', '2026-06-03': '지방선거', '2026-06-06': '현충일', '2026-08-15': '광복절',
+  '2026-08-17': '대체공휴일', '2026-09-24': '추석 연휴', '2026-09-25': '추석', '2026-09-26': '추석 연휴',
+  '2026-10-03': '개천절', '2026-10-05': '대체공휴일', '2026-10-09': '한글날', '2026-12-25': '성탄절',
+  '2027-01-01': '신정', '2027-02-06': '설날 연휴', '2027-02-07': '설날', '2027-02-08': '설날 연휴',
+  '2027-02-09': '대체공휴일', '2027-03-01': '삼일절', '2027-05-05': '어린이날', '2027-05-13': '부처님오신날',
+  '2027-06-06': '현충일', '2027-08-15': '광복절', '2027-08-16': '대체공휴일', '2027-09-14': '추석 연휴',
+  '2027-09-15': '추석', '2027-09-16': '추석 연휴', '2027-10-03': '개천절', '2027-10-04': '대체공휴일',
+  '2027-10-09': '한글날', '2027-10-11': '대체공휴일', '2027-12-25': '성탄절', '2027-12-27': '대체공휴일',
+};
+let calYM = new Date(today.getFullYear(), today.getMonth(), 1);
+let calPick = TODAY;
+function itemsOn(day) {
+  return [
+    ...(HOLI[day] ? [{ k: 'h', t: HOLI[day] }] : []),
+    ...scheds.filter(s => s.date === day).map(s => ({ k: 's', t: s.title })),
+    ...todos.filter(t => t.due === day).map(t => ({ k: 't', t: t.text, done: t.done })),
+  ];
+}
+function renderCal() {
+  const y = calYM.getFullYear(), m = calYM.getMonth();
+  $('calTitle').textContent = `${y}년 ${m + 1}월`;
+  const start = new Date(y, m, 1 - new Date(y, m, 1).getDay());
+  let html = ['일', '월', '화', '수', '목', '금', '토'].map((w, i) => `<div class="cal-w ${i === 0 ? 'sun' : i === 6 ? 'sat' : ''}">${w}</div>`).join('');
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    if (i === 35 && d.getMonth() !== m) break;           // 5주로 끝나는 달은 6번째 줄 생략
+    const key = ymd(d), items = itemsOn(key), wd = d.getDay();
+    const cls = ['cal-d', d.getMonth() !== m && 'out', key === TODAY && 'today', key === calPick && 'pick',
+      (wd === 0 || HOLI[key]) && 'sun', wd === 6 && !HOLI[key] && 'sat'].filter(Boolean).join(' ');
+    const shown = items.slice(0, 2).map(it => `<span class="ev ${it.k}${it.done ? ' done' : ''}">${esc(it.t)}</span>`).join('');
+    const more = items.length > 2 ? `<span class="ev more">+${items.length - 2}</span>` : '';
+    const dots = items.length ? `<span class="dots">${items.slice(0, 3).map(it => `<i class="${it.k}"></i>`).join('')}</span>` : '';
+    html += `<button type="button" class="${cls}" data-d="${key}"><span class="n">${d.getDate()}</span>${shown}${more}${dots}</button>`;
+  }
+  $('cal').innerHTML = html;
+  renderCalDay();
+}
+function renderCalDay() {
+  const items = itemsOn(calPick);
+  const label = { h: '공휴일', s: '일정', t: '할 일' };
+  $('calDay').innerHTML = `<div class="cal-day-head"><b>${md(calPick)}</b>${calPick === TODAY ? ' · 오늘' : ` · ${ddayText(dayDiff(calPick))}`}
+      <button type="button" class="primary" id="calAdd">＋ 이 날 일정 넣기</button></div>
+    ${items.length ? `<ul>${items.map(it => `<li><i class="${it.k}"></i><small>${label[it.k]}</small><span class="${it.done ? 'done' : ''}">${esc(it.t)}</span></li>`).join('')}</ul>`
+      : '<div class="empty-note">이 날은 비어 있어요.</div>'}`;
+}
+$('cal').addEventListener('click', e => {
+  const b = e.target.closest('[data-d]'); if (!b) return;
+  calPick = b.dataset.d;
+  const d = new Date(calPick + 'T00:00:00');
+  if (d.getMonth() !== calYM.getMonth()) calYM = new Date(d.getFullYear(), d.getMonth(), 1);
+  renderCal();
+});
+$('calDay').addEventListener('click', e => {
+  if (e.target.id !== 'calAdd') return;
+  $('schedDate').value = calPick;
+  $('schedTitle').focus();
+  $('schedTitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+$('calPrev').addEventListener('click', () => { calYM = new Date(calYM.getFullYear(), calYM.getMonth() - 1, 1); renderCal(); });
+$('calNext').addEventListener('click', () => { calYM = new Date(calYM.getFullYear(), calYM.getMonth() + 1, 1); renderCal(); });
+$('calToday').addEventListener('click', () => { calYM = new Date(today.getFullYear(), today.getMonth(), 1); calPick = TODAY; renderCal(); });
+
+renderTodos(); renderScheds(); renderLinks(); renderSummary(); renderCal();
 </script>
 </body>
 </html>

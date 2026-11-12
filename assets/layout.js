@@ -24,8 +24,11 @@ const Store = {
   },
 };
 
+// 루나(Claude)와 대화하는 곳 - 지금 쓰는 Claude 요금제 그대로라 추가 비용 없어요
+const LUNA_URL = 'https://claude.ai/new';
+
 (() => {
-  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const esc =s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const page = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
   const isHome = page === '' || page === 'index.html';
   const days = ['일', '월', '화', '수', '목', '금', '토'];
@@ -33,7 +36,8 @@ const Store = {
 
   function navHTML() {
     let html = `<div class="nav-group">홈</div>
-      <a href="index.html" class="${isHome ? 'active' : ''}"><span class="ico">🏠</span><span class="label">대시보드</span></a>`;
+      <a href="index.html" class="${isHome ? 'active' : ''}"><span class="ico">🏠</span><span class="label">대시보드</span></a>
+      <a href="${LUNA_URL}" target="_blank" rel="noopener"><span class="ico">💬</span><span class="label">루나랑 대화하기</span><span class="state">↗</span></a>`;
     const groups = [...new Set(TOOLS.map(t => t.group))];
     for (const g of groups) {
       html += `<div class="nav-group">${esc(g)}</div>`;
@@ -82,7 +86,10 @@ const Store = {
           </div>
         </div>
         <main class="content"></main>
-      </div>`;
+      </div>
+      <a class="luna-fab" href="${LUNA_URL}" target="_blank" rel="noopener" title="루나랑 대화하기 (새 창으로 열려요)">
+        <span class="luna-fab-ico">🐯</span><span class="luna-fab-txt">루나랑 대화</span>
+      </a>`;
     const content = app.querySelector('.content');
     kids.forEach(n => { if (n.nodeName !== 'SCRIPT' && n.id !== 'lockScreen') content.appendChild(n); });
     body.prepend(app);
@@ -133,6 +140,7 @@ const Store = {
           <li>위쪽 검색창은 <b>/</b> 키로 바로 열 수 있어요.</li>
           <li>대시보드의 할일·일정·메모·링크는 <b>이 컴퓨터의 크롬</b>에 저장돼요.</li>
           <li>🔒 <b>컴퓨터를 1분</b> 동안 쓰지 않으면 자동으로 잠겨요(카톡처럼 다른 프로그램을 쓰는 중이면 안 잠겨요. 처음에 "허용"을 눌러 주세요). 위쪽 🔒 버튼으로 바로 잠글 수도 있어요.</li>
+          <li>💬 오른쪽 아래 <b>루나랑 대화</b> 버튼을 누르면 Claude 창이 새로 열려요. 지금 요금제 그대로라 돈이 더 들지 않아요.</li>
           <li>새 도구가 필요하면 루나한테 말해 주세요! 🐯</li>
         </ul>
         <div class="actions"><button type="button" data-act="pw">🔑 비밀번호 바꾸기</button><button class="primary" type="button">알겠어요</button></div>
