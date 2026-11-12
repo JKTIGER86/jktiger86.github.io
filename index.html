@@ -12,6 +12,7 @@
 <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
 <meta name="theme-color" content="#ffc531">
 <script src="assets/layout.js"></script>
+<script src="assets/work.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -35,6 +36,9 @@
       <div class="info-sub">남은 할 일</div>
       <div class="kv"><span>가장 가까운 일정</span><b id="nextEvent">-</b></div>
       <div class="kv"><span>이번 주 끝낸 일</span><b id="weekDone">0개</b></div>
+      <div class="kv"><span>업무 지도: 날짜 지난 일</span><b id="workOver"><a href="work.html">0개</a></b></div>
+      <div class="kv"><span>업무 지도: 7일 안에 할 일</span><b id="workWeek"><a href="work.html">0개</a></b></div>
+      <div class="kv"><span>사무실 안 끝난 일</span><b id="officeOpen"><a href="office.html">0건</a></b></div>
       <div class="kv"><span>송금 장부 안 끝난 일</span><b id="remitOpen"><a href="remit-check.html">점검하기</a></b></div>
       <div class="kv"><span>근속</span><b id="career"><button type="button" id="setJoin" style="padding:4px 10px;font-size:12px">입사일 넣기</button></b></div>
       <div class="kv hidden" id="joinRow"><span>입사일</span><b class="row-form"><input type="date" id="joinDate"><button type="button" id="saveJoin" class="primary" style="padding:6px 12px">저장</button></b></div>
@@ -51,7 +55,7 @@
             <button type="button" id="calNext" aria-label="다음 달">›</button>
           </div>
         </div>
-        <p class="card-desc">날짜를 누르면 그날 일정을 바로 넣을 수 있어요. <span class="cal-legend"><i class="lg-s"></i>일정 <i class="lg-t"></i>할 일 <i class="lg-h"></i>공휴일</span></p>
+        <p class="card-desc">날짜를 누르면 그날 일정을 바로 넣을 수 있어요. <span class="cal-legend"><i class="lg-s"></i>일정 <i class="lg-t"></i>할 일 <i class="lg-w"></i>업무 <i class="lg-h"></i>공휴일</span></p>
         <div class="cal" id="cal"></div>
         <div class="cal-day" id="calDay"></div>
       </section>
@@ -253,6 +257,10 @@ function renderSummary() {
   $('nextEvent').innerHTML = next ? `${esc(next.title)}<small>${ddayText(dayDiff(next.date))} · ${md(next.date)}</small>` : '-';
   const monday = new Date(today); monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
   $('weekDone').textContent = todos.filter(t => t.done && t.doneAt && t.doneAt >= ymd(monday)).length + '개';
+  const ws = Work.summary();
+  $('workOver').innerHTML = `<a href="work.html" style="${ws.over.length ? 'color:var(--danger)' : ''}">${ws.over.length}개</a>${ws.today.length ? `<small>오늘 할 일 ${ws.today.length}개</small>` : ''}`;
+  $('workWeek').innerHTML = `<a href="work.html">${ws.week.length}개</a>${ws.week.length ? `<small>${esc(ws.week.sort((a, b) => (a.next < b.next ? -1 : 1))[0].name)} ${md(ws.week[0].next)}</small>` : ''}`;
+  $('officeOpen').innerHTML = `<a href="office.html">${Store.get('office.open', 0)}건</a>`;
   const ro = Store.get('remit.open', null);
   if (ro) $('remitOpen').innerHTML = `<a href="remit-check.html">${ro.n}건</a><small>${md(ro.at)} 기준</small>`;
   const join = Store.get('joinDate', '');
@@ -286,10 +294,21 @@ const HOLI = {
 };
 let calYM = new Date(today.getFullYear(), today.getMonth(), 1);
 let calPick = TODAY;
+let workMap = new Map();   // 날짜 → 그날 할 업무 지도 일들
+function buildWorkMap(from, to) {
+  workMap = new Map();
+  for (const t of Work.load().tasks) {
+    for (const d of Work.occurrences(t, from, to)) {
+      if (!workMap.has(d)) workMap.set(d, []);
+      workMap.get(d).push({ k: 'w', t: `${t.icon || ''} ${t.name}`.trim(), id: t.id, over: d < TODAY });
+    }
+  }
+}
 function itemsOn(day) {
   return [
     ...(HOLI[day] ? [{ k: 'h', t: HOLI[day] }] : []),
     ...scheds.filter(s => s.date === day).map(s => ({ k: 's', t: s.title })),
+    ...(workMap.get(day) || []),
     ...todos.filter(t => t.due === day).map(t => ({ k: 't', t: t.text, done: t.done })),
   ];
 }
@@ -297,6 +316,8 @@ function renderCal() {
   const y = calYM.getFullYear(), m = calYM.getMonth();
   $('calTitle').textContent = `${y}년 ${m + 1}월`;
   const start = new Date(y, m, 1 - new Date(y, m, 1).getDay());
+  const gridEnd = new Date(start); gridEnd.setDate(start.getDate() + 41);
+  buildWorkMap(ymd(start), ymd(gridEnd));
   let html = ['일', '월', '화', '수', '목', '금', '토'].map((w, i) => `<div class="cal-w ${i === 0 ? 'sun' : i === 6 ? 'sat' : ''}">${w}</div>`).join('');
   for (let i = 0; i < 42; i++) {
     const d = new Date(start); d.setDate(start.getDate() + i);
@@ -314,10 +335,12 @@ function renderCal() {
 }
 function renderCalDay() {
   const items = itemsOn(calPick);
-  const label = { h: '공휴일', s: '일정', t: '할 일' };
+  const label = { h: '공휴일', s: '일정', t: '할 일', w: '업무' };
   $('calDay').innerHTML = `<div class="cal-day-head"><b>${md(calPick)}</b>${calPick === TODAY ? ' · 오늘' : ` · ${ddayText(dayDiff(calPick))}`}
       <button type="button" class="primary" id="calAdd">＋ 이 날 일정 넣기</button></div>
-    ${items.length ? `<ul>${items.map(it => `<li><i class="${it.k}"></i><small>${label[it.k]}</small><span class="${it.done ? 'done' : ''}">${esc(it.t)}</span></li>`).join('')}</ul>`
+    ${items.length ? `<ul>${items.map(it => `<li><i class="${it.k}"></i><small>${label[it.k]}</small>${it.k === 'w'
+        ? `<a href="work.html#t-${it.id}" style="${it.over ? 'color:var(--danger);font-weight:700' : ''}">${esc(it.t)}${it.over ? ' (날짜 지남)' : ''}</a>`
+        : `<span class="${it.done ? 'done' : ''}">${esc(it.t)}</span>`}</li>`).join('')}</ul>`
       : '<div class="empty-note">이 날은 비어 있어요.</div>'}`;
 }
 $('cal').addEventListener('click', e => {

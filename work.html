@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>내 업무 지도</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/owner.js"></script>
+<script src="assets/lock.js"></script>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#ffc531">
+<script src="assets/layout.js"></script>
+<script src="assets/work.js"></script>
+<style>
+  .now { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 16px; }
+  .now-box { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+  .now-box h3 { margin: 0 0 8px; font-size: 14px; display: flex; justify-content: space-between; }
+  .now-box h3 b { font-size: 20px; }
+  .now-box.over { border-color: var(--danger); }
+  .now-box.over h3 { color: var(--danger); }
+  .now-box ul { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+  .now-box li { padding: 4px 0; display: flex; gap: 6px; align-items: baseline; }
+  .now-box li a { color: var(--text); cursor: pointer; }
+  .now-box li a:hover { text-decoration: underline; }
+  .now-box li small { color: var(--sub); margin-left: auto; white-space: nowrap; }
+  .now-box .none { color: var(--sub); font-size: 13px; }
+
+  .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 24px 0 6px; }
+  .bar .chips { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+  .bar .chips button { border-radius: 999px; padding: 6px 13px; font-size: 13px; }
+  .bar .chips button.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .bar input[type=search] { height: 36px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); padding: 0 12px; min-width: 180px; }
+
+  .cat-title { display: flex; align-items: center; gap: 8px; margin: 26px 0 10px; font-size: 17px; font-weight: 800; }
+  .cat-title small { color: var(--sub); font-weight: 600; font-size: 13px; }
+  .tasks { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .task { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .task.over { border-color: var(--danger); box-shadow: 0 0 0 1px var(--danger) inset; }
+  .task.today { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .task.flash { animation: flash 1.2s; }
+  @keyframes flash { 0%, 60% { background: var(--accent-soft); } 100% { background: var(--card); } }
+  .task-top { display: flex; gap: 8px; align-items: flex-start; }
+  .task-top .ico { font-size: 22px; line-height: 1; }
+  .task-top b { font-size: 15px; display: block; }
+  .task-top .freq { font-size: 12px; color: var(--sub); }
+  .task-top .when { margin-left: auto; text-align: right; white-space: nowrap; font-size: 12px; color: var(--sub); }
+  .badge { display: inline-block; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-strong); margin-bottom: 2px; }
+  .badge.over { background: var(--danger); color: #fff; }
+  .badge.today { background: var(--accent); color: var(--on-accent); }
+  .badge.nodate { background: var(--warn-soft); color: var(--warn); }
+  .badge.free { background: var(--card-2); color: var(--sub); }
+  .checks { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+  .checks li { display: flex; gap: 6px; align-items: flex-start; padding: 2px 0; }
+  .checks input { margin-top: 2px; accent-color: var(--accent); flex-shrink: 0; }
+  .checks li.done span { text-decoration: line-through; color: var(--sub); }
+  .prog { height: 4px; border-radius: 4px; background: var(--card-2); overflow: hidden; }
+  .prog i { display: block; height: 100%; background: var(--ready); }
+  .task .memo { font-size: 12px; color: var(--sub); background: var(--card-2); border-radius: 8px; padding: 6px 8px; white-space: pre-wrap; }
+  .task .lnk { font-size: 12px; word-break: break-all; }
+  .task .acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; }
+  .task .acts button { padding: 6px 10px; font-size: 12px; }
+  .task .last { font-size: 11px; color: var(--sub); }
+
+  .fm { display: grid; gap: 10px; }
+  .fm label { display: grid; gap: 4px; font-size: 13px; color: var(--sub); }
+  .fm input, .fm select, .fm textarea { height: 38px; border: 1px solid var(--line); border-radius: 10px; background: var(--card-2); padding: 0 10px; font: inherit; color: var(--text); }
+  .fm textarea { height: auto; min-height: 110px; padding: 8px 10px; resize: vertical; }
+  .fm .row2 { display: grid; grid-template-columns: 80px 1fr; gap: 8px; }
+  .fm .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .modal.wide { max-width: 620px; }
+  .hist { list-style: none; padding: 0; margin: 0 0 12px; }
+  .hist li { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .hist li span { flex: 1; color: var(--sub); }
+  .hist li button { padding: 2px 8px; font-size: 12px; }
+  .backup { margin-top: 36px; }
+  .backup p { color: var(--sub); font-size: 13px; margin: 0 0 8px; }
+  @media (max-width: 520px) { .fm .row3 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>내 업무 지도 🗺️</h1>
+    <p>경호님이 맡은 일을 한눈에 모았어요. 주기를 정해 두면 다음에 할 날짜를 알아서 계산해서, 놓치지 않게 대시보드와 달력에 보여 줘요.</p>
+  </header>
+
+  <div class="now" id="now"></div>
+
+  <div class="bar">
+    <div class="chips" id="chips"></div>
+    <input type="search" id="q" placeholder="업무 찾기">
+    <button class="primary" type="button" id="addBtn">＋ 업무 추가</button>
+  </div>
+
+  <div id="list"></div>
+
+  <section class="panel backup">
+    <div class="card-title"><h3>💾 백업</h3></div>
+    <p>업무 지도·장부·할일·일정은 이 컴퓨터 크롬에만 저장돼요. 컴퓨터를 바꾸거나 크롬을 지우기 전에 백업 파일을 받아 두세요.</p>
+    <div class="actions" style="margin-top:8px">
+      <button type="button" id="bkDown">📤 백업 파일 받기</button>
+      <button type="button" id="bkUp">📥 백업 파일 불러오기</button>
+      <button type="button" id="reset">처음 업무 목록으로 되돌리기</button>
+      <input type="file" id="bkFile" accept=".json" class="hidden">
+    </div>
+  </section>
+
+  <footer>업무 지도는 이 컴퓨터에만 저장돼요 · 직원 개인정보는 적지 마세요 · made by 경호 &amp; 루나</footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const md = s => { const d = Work.parse(s); return `${d.getMonth() + 1}/${d.getDate()} (${Work.DAYS[d.getDay()]})`; };
+let data = Work.load();
+let catFilter = new URLSearchParams(location.search).get('cat') || 'all', query = '';
+if (catFilter !== 'all' && !data.cats.some(c => c.id === catFilter)) catFilter = 'all';
+
+function badge(t) {
+  if (!t.next) {
+    if (!t.freq || t.freq.type === 'none') return '<span class="badge free">수시</span>';
+    return '<span class="badge nodate">날짜를 정해 주세요</span>';
+  }
+  const n = Work.dday(t.next);
+  if (n < 0) return `<span class="badge over">${-n}일 지남</span>`;
+  if (n === 0) return '<span class="badge today">오늘</span>';
+  return `<span class="badge">D-${n}</span>`;
+}
+function stateOf(t) { if (!t.next) return ''; const n = Work.dday(t.next); return n < 0 ? 'over' : n === 0 ? 'today' : ''; }
+
+function renderNow() {
+  const s = Work.summary(data);
+  const box = (cls, title, list, fmt) => `<div class="now-box ${cls}"><h3>${title}<b>${list.length}</b></h3>
+    ${list.length ? `<ul>${list.slice(0, 6).map(t => `<li>${t.icon || '•'} <a data-go="${t.id}">${esc(t.name)}</a><small>${fmt(t)}</small></li>`).join('')}${list.length > 6 ? `<li class="none">외 ${list.length - 6}개</li>` : ''}</ul>` : '<div class="none">없어요 👍</div>'}</div>`;
+  const byDate = (a, b) => (a.next < b.next ? -1 : 1);
+  $('now').innerHTML =
+    box(s.over.length ? 'over' : '', '🔴 날짜 지난 일', s.over.sort(byDate), t => `${-Work.dday(t.next)}일 지남`) +
+    box('', '🟡 오늘 할 일', s.today, () => '오늘') +
+    box('', '📅 7일 안에 할 일', s.week.sort(byDate), t => md(t.next)) +
+    box('', '❓ 날짜 정해야 할 일', s.noDate, t => Work.freqText(t.freq));
+}
+
+function renderChips() {
+  $('chips').innerHTML = [['all', '전체']].concat(data.cats.map(c => [c.id, `${c.icon} ${c.name}`]))
+    .map(([id, n]) => `<button type="button" data-cat="${id}" class="${id === catFilter ? 'on' : ''}">${esc(n)}</button>`).join('');
+}
+
+function linkHTML(l) {
+  if (!l) return '';
+  if (/^[\w-]+\.html$/.test(l)) {
+    const tool = TOOLS.find(x => x.href === l);
+    return `<a class="lnk" href="${esc(l)}">👉 ${tool ? esc(tool.icon + ' ' + tool.name) : esc(l)} 열기</a>`;
+  }
+  if (/^https?:\/\//i.test(l)) return `<a class="lnk" href="${esc(l)}" target="_blank" rel="noopener">🔗 ${esc(l)}</a>`;
+  return `<span class="lnk">📁 ${esc(l)} <button type="button" data-copy="${esc(l)}" style="padding:1px 6px;font-size:11px">복사</button></span>`;
+}
+
+function taskHTML(t) {
+  const done = t.steps.filter(s => s.done).length;
+  const last = t.history.length ? t.history[t.history.length - 1].date : '';
+  return `<div class="task ${stateOf(t)}" id="t-${t.id}">
+    <div class="task-top"><span class="ico">${esc(t.icon || '•')}</span>
+      <div><b>${esc(t.name)}</b><span class="freq">${esc(Work.freqText(t.freq))}</span></div>
+      <div class="when">${badge(t)}${t.next ? `<br>${md(t.next)}` : ''}</div></div>
+    ${t.steps.length ? `<div class="prog"><i style="width:${Math.round(done / t.steps.length * 100)}%"></i></div>
+      <ul class="checks">${t.steps.map((s, i) => `<li class="${s.done ? 'done' : ''}"><input type="checkbox" data-step="${t.id}:${i}" ${s.done ? 'checked' : ''} id="s-${t.id}-${i}"><label for="s-${t.id}-${i}"><span>${esc(s.t)}</span></label></li>`).join('')}</ul>` : ''}
+    ${t.memo ? `<div class="memo">${esc(t.memo)}</div>` : ''}
+    ${linkHTML(t.link)}
+    ${last ? `<div class="last">마지막으로 끝낸 날: ${md(last)} · 총 ${t.history.length}번</div>` : ''}
+    <div class="acts">
+      <button type="button" class="primary" data-done="${t.id}">✓ ${t.freq && t.freq.type !== 'none' ? '이번 회차 끝' : '끝냈어요'}</button>
+      <button type="button" data-edit="${t.id}">✏️ 고치기</button>
+      ${t.history.length ? `<button type="button" data-hist="${t.id}">📜 기록</button>` : ''}
+    </div></div>`;
+}
+
+function renderList() {
+  const q = query.trim().toLowerCase();
+  const order = t => (t.next ? (Work.dday(t.next) < 0 ? 0 : 1) : 2);
+  let html = '';
+  for (const c of data.cats) {
+    if (catFilter !== 'all' && catFilter !== c.id) continue;
+    const ts = data.tasks.filter(t => t.cat === c.id && (!q || (t.name + ' ' + t.memo + ' ' + t.steps.map(s => s.t).join(' ')).toLowerCase().includes(q)))
+      .sort((a, b) => order(a) - order(b) || (a.next || '9') .localeCompare(b.next || '9'));
+    if (!ts.length && q) continue;
+    const empty = !data.tasks.some(t => t.cat === c.id);
+    html += `<div class="cat-title">${esc(c.icon)} ${esc(c.name)} <small>${ts.length}개</small>${empty ? ` <button type="button" data-delcat="${c.id}" style="padding:2px 8px;font-size:12px">분류 지우기</button>` : ''}</div>
+      <div class="tasks">${ts.map(taskHTML).join('') || '<div class="empty-note">아직 업무가 없어요. 위에서 추가해 보세요.</div>'}</div>`;
+  }
+  const orphan = data.tasks.filter(t => !data.cats.some(c => c.id === t.cat));
+  if (orphan.length && catFilter === 'all') html += `<div class="cat-title">📎 분류 없음</div><div class="tasks">${orphan.map(taskHTML).join('')}</div>`;
+  $('list').innerHTML = html || '<div class="empty-note">찾는 업무가 없어요.</div>';
+}
+function render() { renderNow(); renderChips(); renderList(); }
+function save() { Work.save(data); render(); if (window.refreshNav) refreshNav(); }
+
+/* ── 고치기 / 추가 창 ── */
+function openEdit(id) {
+  const t = id ? data.tasks.find(x => x.id === id) : { icon: '📌', name: '', cat: catFilter !== 'all' ? catFilter : data.cats[0].id, freq: { type: 'none' }, next: '', steps: [], memo: '', link: '' };
+  const fk = Work.freqKey(t.freq);
+  const dayOpts = Array.from({ length: 30 }, (_, i) => i + 1).map(d => `<option value="${d}">${d}일</option>`).join('') + '<option value="31">말일</option>';
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.innerHTML = `<form class="modal wide fm" id="fm">
+    <h3>${id ? '✏️ 업무 고치기' : '＋ 업무 추가'}</h3>
+    <div class="row2"><label>아이콘<input name="icon" value="${esc(t.icon)}" maxlength="4"></label>
+      <label>업무 이름<input name="name" value="${esc(t.name)}" required maxlength="40" placeholder="예: 사산휴가 신청"></label></div>
+    <label>분류<select name="cat">${data.cats.map(c => `<option value="${c.id}" ${c.id === t.cat ? 'selected' : ''}>${esc(c.icon + ' ' + c.name)}</option>`).join('')}<option value="__new">＋ 새 분류 만들기…</option></select></label>
+    <div class="row3">
+      <label>주기<select name="freq">${Work.FREQS.map(([k, n]) => `<option value="${k}" ${k === fk ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+      <label class="w-wd">요일<select name="weekday">${Work.DAYS.map((d, i) => `<option value="${i}" ${t.freq.weekday === i ? 'selected' : ''}>${d}요일</option>`).join('')}</select></label>
+      <label class="w-day">날짜<select name="day">${dayOpts}</select></label>
+    </div>
+    <label>다음에 할 날짜 <small style="color:var(--sub)">(비워 두면 주기에 맞춰 자동으로 정해요. 수시 업무는 하려는 날을 넣으면 알려 줘요)</small><input type="date" name="next" value="${t.next || ''}"></label>
+    <label>체크리스트 <small style="color:var(--sub)">(한 줄에 하나씩)</small><textarea name="steps">${esc(t.steps.map(s => s.t).join('\n'))}</textarea></label>
+    <label>바로가기 <small style="color:var(--sub)">(비서 도구 파일 이름, 웹 주소, 또는 폴더 경로)</small><input name="link" value="${esc(t.link)}" placeholder="예: remit-check.html 또는 C:\\Users\\...\\폴더"></label>
+    <label>메모<textarea name="memo" style="min-height:70px">${esc(t.memo)}</textarea></label>
+    <div class="actions">${id ? '<button type="button" data-act="del" style="margin-right:auto;color:var(--danger)">🗑 지우기</button>' : ''}
+      <button type="button" data-act="cancel">취소</button><button class="primary" type="submit">저장</button></div>
+  </form>`;
+  document.body.appendChild(bg);
+  const f = bg.querySelector('#fm');
+  f.day.value = String(t.freq.day || 1);
+  const sync = () => {
+    const k = f.freq.value;
+    bg.querySelector('.w-wd').style.display = k === 'weekly' ? '' : 'none';
+    bg.querySelector('.w-day').style.display = /^m\d+$/.test(k) ? '' : 'none';
+  };
+  f.freq.addEventListener('change', sync); sync();
+  f.cat.addEventListener('change', () => {
+    if (f.cat.value !== '__new') return;
+    const name = (prompt('새 분류 이름을 적어 주세요 (예: 개인 일)') || '').trim();
+    if (!name) { f.cat.value = t.cat; return; }
+    const icon = (prompt('분류 아이콘(이모지 하나)을 적어 주세요', '📁') || '📁').trim().slice(0, 4);
+    const c = { id: 'c' + Work.uid(), icon, name };
+    data.cats.push(c);
+    const o = document.createElement('option'); o.value = c.id; o.textContent = `${icon} ${name}`;
+    f.cat.insertBefore(o, f.cat.lastElementChild); f.cat.value = c.id;
+  });
+  bg.addEventListener('click', e => {
+    const act = e.target.dataset.act;
+    if (e.target === bg || act === 'cancel') { bg.remove(); data = Work.load(); render(); }
+    if (act === 'del' && confirm(`"${t.name}" 업무를 지울까요? 기록도 같이 지워져요.`)) {
+      data.tasks = data.tasks.filter(x => x.id !== id); bg.remove(); save();
+    }
+  });
+  f.addEventListener('submit', e => {
+    e.preventDefault();
+    const k = f.freq.value;
+    const freq = k === 'none' ? { type: 'none' } : k === 'weekly' ? { type: 'weekly', weekday: +f.weekday.value }
+      : { type: 'months', every: +k.slice(1), day: +f.day.value };
+    const oldSteps = new Map((t.steps || []).map(s => [s.t, s.done]));
+    const steps = f.steps.value.split('\n').map(s => s.trim()).filter(Boolean).map(s => ({ t: s, done: oldSteps.get(s) || false }));
+    let next = f.next.value;
+    const freqChanged = JSON.stringify(freq) !== JSON.stringify(t.freq);
+    if (!next && freq.type !== 'none') next = Work.firstFrom(freq, Work.todayStr());
+    else if (next && freqChanged && freq.type !== 'none' && next === t.next) next = Work.firstFrom(freq, Work.todayStr());
+    const nt = { ...t, icon: f.icon.value.trim() || '📌', name: f.name.value.trim(), cat: f.cat.value === '__new' ? data.cats[0].id : f.cat.value,
+      freq, next, steps, link: f.link.value.trim(), memo: f.memo.value.trim(), history: t.history || [] };
+    if (id) data.tasks = data.tasks.map(x => (x.id === id ? nt : x));
+    else { nt.id = Work.uid(); data.tasks.push(nt); }
+    bg.remove(); save(); flash(nt.id);
+  });
+  setTimeout(() => f.name.focus(), 30);
+}
+
+function openHist(id) {
+  const t = data.tasks.find(x => x.id === id);
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  const rows = () => t.history.slice().reverse().map((h, ri) => {
+    const i = t.history.length - 1 - ri;
+    return `<li><b>${md(h.date)}</b><span>${esc(h.note || '')}</span><button type="button" data-i="${i}">지우기</button></li>`;
+  }).join('');
+  bg.innerHTML = `<div class="modal"><h3>📜 ${esc(t.name)} 기록</h3><ul class="hist">${rows()}</ul>
+    <div class="actions"><button class="primary" type="button" data-act="close">닫기</button></div></div>`;
+  document.body.appendChild(bg);
+  bg.addEventListener('click', e => {
+    if (e.target === bg || e.target.dataset.act === 'close') { bg.remove(); return; }
+    if (e.target.dataset.i != null && confirm('이 기록을 지울까요? (다음 날짜는 그대로예요)')) {
+      t.history.splice(+e.target.dataset.i, 1); Work.save(data);
+      bg.querySelector('.hist').innerHTML = rows(); render();
+    }
+  });
+}
+
+function markDone(id) {
+  const t = data.tasks.find(x => x.id === id);
+  const left = t.steps.filter(s => !s.done).length;
+  if (left && !confirm(`체크 안 한 단계가 ${left}개 있어요. 그래도 끝낼까요?`)) return;
+  const note = prompt('한 줄 메모를 남길까요? (없으면 그냥 확인)', '') ;
+  if (note === null) return;
+  const today = Work.todayStr();
+  t.history.push({ date: today, note: note.trim() });
+  if (t.history.length > 200) t.history.shift();
+  t.next = Work.nextAfterDone(t, today);
+  t.steps.forEach(s => { s.done = false; });
+  save();
+  flash(id, t.next ? `다음은 ${md(t.next)}이에요` : '수고했어요!');
+}
+function flash(id, text) {
+  const el = $('t-' + id); if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+  if (text) { const n = document.createElement('div'); n.className = 'last'; n.style.color = 'var(--ready)'; n.textContent = '✅ ' + text; el.querySelector('.acts').before(n); }
+}
+
+/* ── 이벤트 ── */
+$('addBtn').addEventListener('click', () => openEdit(null));
+$('chips').addEventListener('click', e => {
+  const b = e.target.closest('[data-cat]'); if (!b) return;
+  catFilter = b.dataset.cat;
+  history.replaceState(null, '', catFilter === 'all' ? 'work.html' : 'work.html?cat=' + encodeURIComponent(catFilter));
+  render(); if (window.refreshNav) refreshNav();
+});
+$('q').addEventListener('input', e => { query = e.target.value; renderList(); });
+$('now').addEventListener('click', e => {
+  const a = e.target.closest('[data-go]'); if (!a) return;
+  if (catFilter !== 'all' || query) { catFilter = 'all'; query = ''; $('q').value = ''; render(); }
+  flash(a.dataset.go);
+});
+$('list').addEventListener('click', async e => {
+  const d = e.target.dataset;
+  if (d.done) markDone(d.done);
+  else if (d.edit) openEdit(d.edit);
+  else if (d.hist) openHist(d.hist);
+  else if (d.delcat && confirm('빈 분류를 지울까요?')) { data.cats = data.cats.filter(c => c.id !== d.delcat); if (catFilter === d.delcat) catFilter = 'all'; save(); }
+  else if (d.copy) { try { await navigator.clipboard.writeText(d.copy); e.target.textContent = '✓'; } catch { prompt('복사해서 쓰세요', d.copy); } }
+});
+$('list').addEventListener('change', e => {
+  const s = e.target.dataset.step; if (!s) return;
+  const [id, i] = s.split(':');
+  const t = data.tasks.find(x => x.id === id); t.steps[+i].done = e.target.checked;
+  Work.save(data);
+  const li = e.target.closest('li'); li.classList.toggle('done', e.target.checked);
+  const done = t.steps.filter(x => x.done).length;
+  $('t-' + id).querySelector('.prog i').style.width = Math.round(done / t.steps.length * 100) + '%';
+});
+
+// 백업
+$('bkDown').addEventListener('click', () => {
+  const out = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k.startsWith('biseo.') && k !== 'biseo.session') out[k] = localStorage.getItem(k);
+  }
+  const blob = new Blob([JSON.stringify({ app: 'biseo', at: new Date().toISOString(), data: out }, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `업무비서_백업_${Work.todayStr().replace(/-/g, '')}.json`;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+});
+$('bkUp').addEventListener('click', () => $('bkFile').click());
+$('bkFile').addEventListener('change', async () => {
+  const f = $('bkFile').files[0]; if (!f) return;
+  try {
+    const j = JSON.parse(await f.text());
+    if (j.app !== 'biseo' || !j.data) throw new Error('업무 비서 백업 파일이 아니에요.');
+    if (!confirm(`${new Date(j.at).toLocaleString('ko-KR')}에 받은 백업으로 바꿀까요? 지금 이 컴퓨터의 내용은 백업 내용으로 덮어써져요.`)) return;
+    Object.entries(j.data).forEach(([k, v]) => { if (k.startsWith('biseo.') && k !== 'biseo.session') localStorage.setItem(k, v); });
+    alert('불러왔어요!'); location.reload();
+  } catch (err) { alert('불러오지 못했어요: ' + err.message); }
+  $('bkFile').value = '';
+});
+$('reset').addEventListener('click', () => {
+  if (!confirm('업무 지도를 처음 목록으로 되돌릴까요? 직접 추가하거나 고친 업무와 기록이 모두 지워져요. (다른 데이터는 그대로예요)')) return;
+  data = Work.seed(); save();
+});
+
+render();
+if (location.hash.startsWith('#t-')) setTimeout(() => flash(location.hash.slice(3)), 100);
+</script>
+</body>
+</html>

@@ -63,6 +63,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .nav a.active .ico { background: rgba(255, 255, 255, .45); }
 .nav .label { flex: 1; min-width: 0; }
 .nav .state { font-size: 11px; color: var(--ready); }
+.nav a.sub { padding: 5px 10px 5px 26px; font-size: 13px; }
+.nav a.sub .ico { width: 20px; height: 20px; font-size: 12px; background: none; }
+.nav .state.due { min-width: 20px; padding: 1px 6px; border-radius: 999px; background: var(--danger); color: #fff; font-weight: 800; text-align: center; }
+.nav .state.due.soft { background: var(--warn-soft); color: var(--warn); }
 .nav span.disabled { color: var(--sub); cursor: default; }
 .nav span.disabled .state { color: var(--sub); }
 .side-foot { margin-top: auto; padding: 16px 10px 0; color: var(--sub); font-size: 12px; }
@@ -308,6 +312,8 @@ html.locked body { overflow: hidden; }
 .lg-s, i.s { background: var(--accent); }
 .lg-t, i.t { background: var(--down); }
 .lg-h, i.h { background: var(--danger); }
+.lg-w, i.w { background: var(--ready); }
+.cal-d .ev.w { background: var(--ready-soft); color: var(--ready); }
 .cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin-top: 12px; }
 .cal-w { text-align: center; font-size: 12px; font-weight: 600; color: var(--sub); padding: 4px 0; }
 .cal-w.sun, .cal-d.sun .n { color: var(--danger); }

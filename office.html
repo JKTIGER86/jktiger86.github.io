@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>사무실 관리함</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/owner.js"></script>
+<script src="assets/lock.js"></script>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#ffc531">
+<script src="assets/layout.js"></script>
+<style>
+  .kinds { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin-top: 14px; }
+  .kinds button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 6px; font-size: 13px; border-radius: 12px; }
+  .kinds button span { font-size: 24px; line-height: 1; }
+  .kinds button.on { background: var(--accent-soft); border-color: var(--accent); }
+  .of-form { display: grid; grid-template-columns: 140px 1fr 1fr; gap: 8px; margin-top: 14px; }
+  .of-form .full { grid-column: 1 / -1; }
+  .of-form input, .of-form select { height: 38px; border: 1px solid var(--line); border-radius: 10px; background: var(--card-2); padding: 0 10px; font: inherit; color: var(--text); min-width: 0; }
+  .of-bar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 24px 0 8px; }
+  .of-bar button { border-radius: 999px; padding: 6px 13px; font-size: 13px; }
+  .of-bar button.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .items { display: grid; gap: 8px; }
+  .item { display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: start; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .item.done { opacity: .6; }
+  .item.late { border-color: var(--danger); }
+  .item .k { font-size: 26px; text-align: center; }
+  .item b { font-size: 15px; }
+  .item .meta { font-size: 12px; color: var(--sub); margin-top: 2px; }
+  .item .meta .old { color: var(--danger); font-weight: 700; }
+  .item .more { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .item .more input { height: 30px; border: 1px solid var(--line); border-radius: 8px; background: var(--card-2); padding: 0 8px; font-size: 12px; min-width: 0; }
+  .item .side-r { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+  .item select { height: 32px; border: 1px solid var(--line); border-radius: 8px; background: var(--card-2); padding: 0 6px; font-size: 13px; }
+  .item .x { padding: 2px 8px; font-size: 12px; }
+  .vend { display: grid; gap: 6px; margin-top: 10px; }
+  .vend div { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 6px; align-items: center; font-size: 14px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .vend div span { color: var(--sub); }
+  @media (max-width: 640px) {
+    .of-form { grid-template-columns: 1fr; }
+    .item { grid-template-columns: 34px 1fr; }
+    .item .side-r { grid-column: 1 / -1; flex-direction: row; justify-content: flex-end; }
+    .vend div { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>사무실 관리함 🔧</h1>
+    <p>전구가 나갔다, 변기가 막혔다, 곰팡이가 폈다… 생기는 대로 바로 적어 두고, 끝날 때까지 챙겨요.</p>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <section class="panel">
+    <div class="card-title"><h3>＋ 새로 생긴 문제 적기</h3><small>종류를 누르고 내용만 적으면 돼요</small></div>
+    <div class="kinds" id="kinds"></div>
+    <form class="of-form" id="form">
+      <input type="date" id="fDate" required aria-label="날짜">
+      <input type="text" id="fPlace" placeholder="장소 (예: 2층 화장실, 창고 입구)" maxlength="40">
+      <input type="text" id="fWho" placeholder="알려 준 사람 (선택)" maxlength="20">
+      <input type="text" id="fText" class="full" placeholder="무슨 일인지 (예: 형광등 2개 깜빡임)" maxlength="120" required>
+      <div class="full actions" style="margin-top:0"><button class="primary" type="submit">적어 두기</button></div>
+    </form>
+  </section>
+
+  <div class="of-bar" id="bar"></div>
+  <div class="items" id="items"></div>
+
+  <section class="panel" style="margin-top:28px">
+    <div class="card-title"><h3>📞 자주 부르는 업체</h3><small>전기·설비·청소·방역 업체 연락처를 모아 두세요</small></div>
+    <div class="vend" id="vend"></div>
+    <form class="of-form" id="vForm">
+      <input type="text" id="vKind" placeholder="분야 (예: 전기)" maxlength="20" required>
+      <input type="text" id="vName" placeholder="업체 이름" maxlength="30" required>
+      <input type="text" id="vTel" placeholder="연락처" maxlength="30">
+      <div class="full actions" style="margin-top:0"><button type="submit">＋ 업체 추가</button></div>
+    </form>
+  </section>
+
+  <footer>사무실 관리함은 이 컴퓨터에만 저장돼요 · made by 경호 &amp; 루나</footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const TODAY = ymd(new Date());
+const md = s => s ? `${+s.slice(5, 7)}/${+s.slice(8, 10)}` : '';
+const days = s => Math.round((new Date(TODAY + 'T00:00:00') - new Date(s + 'T00:00:00')) / 86400000);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const LATE = 7;   // 이보다 오래 안 끝나면 빨간색
+
+const KINDS = [
+  ['light', '💡', '전구·조명'], ['toilet', '🚽', '화장실·배관'], ['leak', '💧', '누수·물'],
+  ['broken', '💥', '깨짐·고장'], ['mold', '🦠', '곰팡이·습기'], ['paint', '🎨', '변색·도색'],
+  ['weed', '🌿', '잡초·바깥'], ['air', '❄️', '냉난방'], ['clean', '🧹', '청소·벌레'], ['etc', '🔧', '기타'],
+];
+const STATES = [['new', '📝 접수'], ['call', '📞 업체 연락함'], ['fix', '🔧 수리 중'], ['done', '✅ 끝']];
+const kindOf = k => KINDS.find(x => x[0] === k) || KINDS[KINDS.length - 1];
+
+let db = Store.get('office', null) || { items: [], vendors: [] };
+let kind = 'light', view = 'open';
+const save = () => {
+  Store.set('office', db); Store.set('office.open', db.items.filter(i => i.state !== 'done').length);
+  render(); if (window.refreshNav) refreshNav();
+};
+
+function render() {
+  const open = db.items.filter(i => i.state !== 'done');
+  const month = TODAY.slice(0, 7);
+  const cost = db.items.filter(i => (i.doneAt || i.date).startsWith(month)).reduce((s, i) => s + (+i.cost || 0), 0);
+  $('stats').innerHTML = [
+    ['안 끝난 일', open.length + '건'],
+    [`${LATE}일 넘게 안 끝난 일`, open.filter(i => days(i.date) > LATE).length + '건'],
+    ['이번 달 접수', db.items.filter(i => i.date.startsWith(month)).length + '건'],
+    ['이번 달 수리비', cost.toLocaleString('ko-KR') + '원'],
+  ].map(([k, v]) => `<div class="stat"><span>${k}</span><b>${v}</b></div>`).join('');
+
+  $('kinds').innerHTML = KINDS.map(([k, ic, n]) => `<button type="button" data-k="${k}" class="${k === kind ? 'on' : ''}"><span>${ic}</span>${n}</button>`).join('');
+
+  const counts = { open: open.length, done: db.items.length - open.length, all: db.items.length };
+  $('bar').innerHTML = [['open', '안 끝난 일'], ['done', '끝난 일'], ['all', '전체']]
+    .map(([k, n]) => `<button type="button" data-v="${k}" class="${k === view ? 'on' : ''}">${n} ${counts[k]}</button>`).join('');
+
+  const list = db.items.filter(i => view === 'all' || (view === 'done' ? i.state === 'done' : i.state !== 'done'))
+    .sort((a, b) => (a.state === 'done') - (b.state === 'done') || (view === 'done' ? (b.doneAt || '').localeCompare(a.doneAt || '') : a.date.localeCompare(b.date)));
+  $('items').innerHTML = list.length ? list.map(i => {
+    const [, ic, kn] = kindOf(i.kind);
+    const d = days(i.date), done = i.state === 'done';
+    return `<div class="item ${done ? 'done' : d > LATE ? 'late' : ''}" data-id="${i.id}">
+      <div class="k">${ic}</div>
+      <div><b>${esc(i.text)}</b>
+        <div class="meta">${kn}${i.place ? ' · ' + esc(i.place) : ''} · ${md(i.date)} 접수${i.who ? ' (' + esc(i.who) + ')' : ''}
+          ${done ? ` · ${md(i.doneAt)} 끝 (${Math.max(0, Math.round((new Date(i.doneAt) - new Date(i.date)) / 86400000))}일 걸림)` : ` · <span class="${d > LATE ? 'old' : ''}">${d}일째</span>`}</div>
+        <div class="more">
+          <input data-f="vendor" value="${esc(i.vendor || '')}" placeholder="부른 업체" maxlength="30" style="width:130px">
+          <input data-f="cost" value="${esc(i.cost || '')}" placeholder="비용(원)" inputmode="numeric" maxlength="12" style="width:100px">
+          <input data-f="note" value="${esc(i.note || '')}" placeholder="메모 (예: 다음 주 화요일 방문)" maxlength="80" style="flex:1;min-width:160px">
+        </div></div>
+      <div class="side-r"><select data-f="state">${STATES.map(([v, n]) => `<option value="${v}" ${v === i.state ? 'selected' : ''}>${n}</option>`).join('')}</select>
+        <button type="button" class="x" data-del="1">지우기</button></div></div>`;
+  }).join('') : `<div class="empty-note">${view === 'open' ? '안 끝난 일이 없어요. 사무실이 평화롭네요 ☕' : '아직 없어요.'}</div>`;
+
+  $('vend').innerHTML = db.vendors.length ? db.vendors.map((v, i) => `<div><b>${esc(v.kind)}</b><span>${esc(v.name)}</span>
+    ${v.tel ? `<a href="tel:${esc(v.tel.replace(/[^\d+]/g, ''))}">${esc(v.tel)}</a>` : '<span>-</span>'}<button type="button" class="x" data-vdel="${i}" style="padding:2px 8px;font-size:12px">지우기</button></div>`).join('')
+    : '<div class="empty-note" style="display:block;border:none">아직 없어요. 아래에서 추가해 주세요.</div>';
+}
+
+$('kinds').addEventListener('click', e => { const b = e.target.closest('[data-k]'); if (b) { kind = b.dataset.k; render(); $('fText').focus(); } });
+$('bar').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (b) { view = b.dataset.v; render(); } });
+$('form').addEventListener('submit', e => {
+  e.preventDefault();
+  db.items.push({ id: uid(), kind, date: $('fDate').value || TODAY, place: $('fPlace').value.trim(), who: $('fWho').value.trim(),
+    text: $('fText').value.trim(), state: 'new', vendor: '', cost: '', note: '', doneAt: '' });
+  $('fText').value = ''; $('fPlace').value = ''; $('fWho').value = '';
+  view = 'open'; save();
+});
+$('items').addEventListener('change', e => {
+  const f = e.target.dataset.f; if (!f) return;
+  const it = db.items.find(x => x.id === e.target.closest('.item').dataset.id);
+  it[f] = f === 'cost' ? e.target.value.replace(/[^\d]/g, '') : e.target.value;
+  if (f === 'state') it.doneAt = it.state === 'done' ? (it.doneAt || TODAY) : '';
+  if (f === 'state' || f === 'cost') save(); else { Store.set('office', db); }
+});
+$('items').addEventListener('click', e => {
+  if (!e.target.dataset.del) return;
+  const it = db.items.find(x => x.id === e.target.closest('.item').dataset.id);
+  if (confirm(`"${it.text}"을(를) 지울까요?`)) { db.items = db.items.filter(x => x !== it); save(); }
+});
+$('vForm').addEventListener('submit', e => {
+  e.preventDefault();
+  db.vendors.push({ kind: $('vKind').value.trim(), name: $('vName').value.trim(), tel: $('vTel').value.trim() });
+  $('vKind').value = ''; $('vName').value = ''; $('vTel').value = ''; save();
+});
+$('vend').addEventListener('click', e => {
+  const i = e.target.dataset.vdel; if (i == null) return;
+  if (confirm('이 업체를 지울까요?')) { db.vendors.splice(+i, 1); save(); }
+});
+$('fDate').value = TODAY;
+render();
+</script>
+</body>
+</html>

@@ -3,6 +3,10 @@
  * 새 도구를 만들면 아래 TOOLS 에 한 줄만 추가하면 메뉴·검색·대시보드에 자동으로 나와요.
  */
 const TOOLS = [
+  { href: 'work.html', icon: '🗺️', name: '내 업무 지도', group: '내 업무', ready: true,
+    desc: '맡은 일을 분류·주기별로 모아서, 다음에 할 날짜를 계산해 챙겨 줘요.' },
+  { href: 'office.html', icon: '🔧', name: '사무실 관리함', group: '내 업무', ready: true,
+    desc: '전구·화장실·곰팡이·잡초 같은 사무실 문제를 적어 두고 끝날 때까지 챙겨요.' },
   { href: 'remit-check.html', icon: '🧾', name: '송금·인보이스 체크', group: '송금·인보이스', ready: true,
     desc: '송금영수증에서 금액 차이·도착 미확인·오래된 미입고를 찾고, 받을 돈 장부로 끝까지 챙겨요.' },
   { href: 'price-compare.html', icon: '💸', name: '엑셀 가격 비교', group: '행사 리스트', ready: true,
@@ -26,6 +30,15 @@ const Store = {
   },
 };
 
+// 내 업무 지도의 기본 분류 (업무 지도를 아직 안 열어 봤을 때 메뉴에 보여 줄 것, work.js 와 같아야 해요)
+const WORK_CATS_DEFAULT = [
+  { id: 'hr', icon: '👥', name: '인사·급여' },
+  { id: 'goods', icon: '📦', name: '입고·출고·인보이스' },
+  { id: 'money', icon: '💰', name: '자금·페이백·고객' },
+  { id: 'safety', icon: '🛡️', name: '안전·법정 교육·점검' },
+  { id: 'office', icon: '🏢', name: '사무실 관리' },
+];
+
 // 루나(Claude)와 대화하는 곳 - 지금 쓰는 Claude 요금제 그대로라 추가 비용 없어요
 const LUNA_URL = 'https://claude.ai/new';
 
@@ -36,11 +49,30 @@ const LUNA_URL = 'https://claude.ai/new';
   const days = ['일', '월', '화', '수', '목', '금', '토'];
   const now = new Date();
 
+  // 내 업무 지도의 분류를 메뉴에 그대로 보여 줘요 (날짜 지난 일이 있으면 빨간 숫자)
+  function workNav() {
+    const w = Store.get('work', null);
+    const cats = (w && w.cats) || WORK_CATS_DEFAULT;
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const over = id => w ? w.tasks.filter(t => t.cat === id && t.next && t.next <= today).length : 0;
+    const cur = new URLSearchParams(location.search).get('cat');
+    let html = `<div class="nav-group">내 업무</div>
+      <a href="work.html" class="${page === 'work.html' && !cur ? 'active' : ''}"><span class="ico">🗺️</span><span class="label">내 업무 지도</span></a>`;
+    for (const c of cats) {
+      const n = over(c.id);
+      html += `<a href="work.html?cat=${encodeURIComponent(c.id)}" class="sub ${page === 'work.html' && cur === c.id ? 'active' : ''}"><span class="ico">${esc(c.icon)}</span><span class="label">${esc(c.name)}</span>${n ? `<span class="state due">${n}</span>` : ''}</a>`;
+    }
+    const oo = Store.get('office.open', 0);
+    html += `<a href="office.html" class="${page === 'office.html' ? 'active' : ''}"><span class="ico">🔧</span><span class="label">사무실 관리함</span>${oo ? `<span class="state due soft">${oo}</span>` : ''}</a>`;
+    return html;
+  }
+
   function navHTML() {
     let html = `<div class="nav-group">홈</div>
       <a href="index.html" class="${isHome ? 'active' : ''}"><span class="ico">🏠</span><span class="label">대시보드</span></a>
       <a href="${LUNA_URL}" target="_blank" rel="noopener"><span class="ico">💬</span><span class="label">루나랑 대화하기</span><span class="state">↗</span></a>`;
-    const groups = [...new Set(TOOLS.map(t => t.group))];
+    html += workNav();
+    const groups = [...new Set(TOOLS.filter(t => t.group !== '내 업무').map(t => t.group))];
     for (const g of groups) {
       html += `<div class="nav-group">${esc(g)}</div>`;
       for (const t of TOOLS.filter(x => x.group === g)) {
@@ -92,6 +124,8 @@ const LUNA_URL = 'https://claude.ai/new';
       <a class="luna-fab" href="${LUNA_URL}" target="_blank" rel="noopener" title="루나랑 대화하기 (새 창으로 열려요)">
         <span class="luna-fab-ico">🐯</span><span class="luna-fab-txt">루나랑 대화</span>
       </a>`;
+    // 다른 페이지에서 메뉴 숫자(날짜 지난 일 등)를 다시 그릴 때 써요
+    window.refreshNav = () => { app.querySelector('.nav').innerHTML = navHTML(); };
     const content = app.querySelector('.content');
     kids.forEach(n => { if (n.nodeName !== 'SCRIPT' && n.id !== 'lockScreen') content.appendChild(n); });
     body.prepend(app);
