@@ -50,7 +50,8 @@ const Lock = (() => {
   /* ── 열기 / 잠그기 ── */
   function open() {
     ss.set({ open: true, last: Date.now() });
-    if (sysIdle === 'idle') sysIdle = 'active';   // 방금 비밀번호를 쳤으니 사용 중이에요
+    graceUntil = Date.now() + 10000;               // 방금 비밀번호를 쳤으니 사용 중이에요
+    lastTick = Date.now();
     html.classList.remove('locked');
     const scr = document.getElementById('lockScreen');
     if (scr) scr.remove();
@@ -76,41 +77,57 @@ const Lock = (() => {
    * 안 쓰면 잠가요. 다른 프로그램을 쓰는 중이면 안 잠겨요.
    * 처음 한 번 "허용"을 눌러야 하고, 허용 안 하거나 안 되는 브라우저면 예전처럼
    * 이 앱 안에서 1분 동안 안 쓰면 잠가요. */
-  let sysIdle = null;                 // 'active' | 'idle' | null(사용 안 함)
   const hasIdleApi = 'IdleDetector' in window;
+  let det = null;                     // 감지기는 밖에 붙잡아 둬요 (사라지면 감지가 멈춰요)
+  let permState = hasIdleApi ? 'unknown' : 'unsupported';
+  let graceUntil = 0;                 // 막 비밀번호를 친 뒤 잠깐은 다시 잠그지 않아요
+  const sysState = () => !det ? null : (det.screenState === 'locked' ? 'idle' : det.userState);
   async function startIdle() {
-    if (!hasIdleApi || sysIdle) return;
+    if (!hasIdleApi || det) return;
     try {
-      const det = new IdleDetector();
-      det.addEventListener('change', () => {
-        sysIdle = det.userState;
-        if (det.userState === 'idle' || det.screenState === 'locked') {
-          if (!html.classList.contains('locked')) lock();
-        } else { lastSave = 0; touch(); }
-      });
-      await det.start({ threshold: IDLE_MS });
-      sysIdle = det.userState || 'active';
-    } catch { sysIdle = null; }
+      const d = new IdleDetector();
+      d.addEventListener('change', heartbeat);
+      await d.start({ threshold: IDLE_MS });
+      det = d; permState = 'granted';
+    } catch { det = null; }
   }
-  function askIdle() {          // 버튼을 누른 순간(사용자 동작 안)에 불러야 해요
-    if (!hasIdleApi) return;
-    try { IdleDetector.requestPermission().then(s => { if (s === 'granted') startIdle(); }).catch(() => {}); } catch { /* 무시 */ }
+  function askIdle() {          // 클릭한 순간(사용자 동작 안)에 불러야 해요
+    if (!hasIdleApi || det) return;
+    try {
+      IdleDetector.requestPermission()
+        .then(s => { permState = s; if (s === 'granted') startIdle(); }).catch(() => {});
+    } catch { /* 무시 */ }
   }
   if (hasIdleApi && navigator.permissions) {
-    navigator.permissions.query({ name: 'idle-detection' })
-      .then(p => { if (p.state === 'granted') startIdle(); }).catch(() => {});
+    navigator.permissions.query({ name: 'idle-detection' }).then(p => {
+      permState = p.state;
+      if (p.state === 'granted') startIdle();
+      // 이미 로그인된 상태라 물어볼 기회가 없었으면, 앱을 처음 클릭할 때 한 번 물어봐요
+      else if (p.state === 'prompt') addEventListener('click', askIdle, { once: true, capture: true });
+    }).catch(() => {});
   }
 
-  setInterval(() => {
+  /* 3초마다 확인해요. 크롬이 이 창을 오래 재워 둬서(최소화·가려짐) 그동안 컴퓨터를
+   * 썼는지 알 수 없으면, 안전하게 잠가요. */
+  const GAP_MS = 2 * IDLE_MS;
+  let lastTick = Date.now();
+  function heartbeat() {
+    const now = Date.now(), gap = now - lastTick;
+    lastTick = now;
     if (html.classList.contains('locked')) return;
-    if (sysIdle === 'active') { lastSave = 0; touch(); return; }   // 컴퓨터를 쓰는 중이면 계속 열어 둬요
-    if (sysIdle === 'idle') { lock(); return; }
-    if (!isOpen()) lock();
-  }, 3000);
-  document.addEventListener('visibilitychange', () => {
-    if (sysIdle) return;
-    if (document.visibilityState === 'visible' && !html.classList.contains('locked') && !isOpen()) lock();
-  });
+    if (now < graceUntil) { lastSave = 0; touch(); return; }
+    if (gap > GAP_MS) { lock(); return; }
+    const s = sysState();
+    if (s === 'idle') { lock(); return; }
+    if (s === 'active') { lastSave = 0; touch(); return; }   // 컴퓨터를 쓰는 중이면 계속 열어 둬요
+    if (!isOpen()) lock();                                    // 감지 기능이 없으면: 이 앱 안에서 1분
+  }
+  setInterval(heartbeat, 3000);
+  document.addEventListener('visibilitychange', heartbeat);
+  document.addEventListener('resume', heartbeat);
+  addEventListener('focus', heartbeat);
+  addEventListener('pageshow', heartbeat);
+  const idleStatus = () => det ? 'on' : permState;
 
   /* ── 화면 ── */
   function greeting() {
@@ -216,5 +233,5 @@ const Lock = (() => {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();
 
-  return { lock, changePassword: () => show('change'), IDLE_MS };
+  return { lock, changePassword: () => show('change'), IDLE_MS, idleStatus, askIdle };
 })();

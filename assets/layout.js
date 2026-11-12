@@ -130,6 +130,14 @@ const LUNA_URL = 'https://claude.ai/new';
 
     // 사용법
     app.querySelector('.help-btn').addEventListener('click', () => {
+      const st = window.Lock && Lock.idleStatus ? Lock.idleStatus() : 'unsupported';
+      const idleLine = {
+        on: '✅ <b>켜져 있어요.</b> 컴퓨터를 1분 동안 안 쓰면 잠겨요.',
+        granted: '✅ <b>켜져 있어요.</b> 컴퓨터를 1분 동안 안 쓰면 잠겨요.',
+        prompt: '⚠️ <b>아직 허용 전이에요.</b> <button type="button" data-act="idle">허용하기</button> 를 누르고 크롬 창에서 "허용"을 눌러 주세요.',
+        denied: '❌ <b>차단돼 있어요.</b> 주소창 왼쪽 아이콘 → 사이트 설정에서 "기기 사용 감지"를 허용으로 바꿔 주세요. 그 전까지는 이 앱 안에서 1분 동안 안 쓰면 잠겨요.',
+        unsupported: '⚠️ 이 브라우저는 지원하지 않아서, 이 앱 안에서 1분 동안 안 쓰면 잠겨요.',
+      }[st] || '⏳ 확인 중이에요. 잠시 뒤 다시 열어 주세요.';
       const bg = document.createElement('div');
       bg.className = 'modal-bg';
       bg.innerHTML = `<div class="modal" role="dialog" aria-label="사용법">
@@ -139,7 +147,7 @@ const LUNA_URL = 'https://claude.ai/new';
           <li>엑셀은 <b>끌어다 놓기</b>나 <b>클릭</b>으로 올려요. 파일은 내 컴퓨터 안에서만 처리되고 밖으로 나가지 않아요.</li>
           <li>위쪽 검색창은 <b>/</b> 키로 바로 열 수 있어요.</li>
           <li>대시보드의 할일·일정·메모·링크는 <b>이 컴퓨터의 크롬</b>에 저장돼요.</li>
-          <li>🔒 <b>컴퓨터를 1분</b> 동안 쓰지 않으면 자동으로 잠겨요(카톡처럼 다른 프로그램을 쓰는 중이면 안 잠겨요. 처음에 "허용"을 눌러 주세요). 위쪽 🔒 버튼으로 바로 잠글 수도 있어요.</li>
+          <li>🔒 <b>컴퓨터를 1분</b> 동안 쓰지 않으면 자동으로 잠겨요(카톡처럼 다른 프로그램을 쓰는 중이면 안 잠겨요. 처음에 "허용"을 눌러 주세요). 위쪽 🔒 버튼으로 바로 잠글 수도 있어요.<br><small>자리비움 감지: ${idleLine}</small></li>
           <li>💬 오른쪽 아래 <b>루나랑 대화</b> 버튼을 누르면 Claude 창이 새로 열려요. 지금 요금제 그대로라 돈이 더 들지 않아요.</li>
           <li>새 도구가 필요하면 루나한테 말해 주세요! 🐯</li>
         </ul>
@@ -147,6 +155,7 @@ const LUNA_URL = 'https://claude.ai/new';
       </div>`;
       bg.addEventListener('click', e => {
         if (e.target.dataset.act === 'pw') { bg.remove(); if (window.Lock) Lock.changePassword(); return; }
+        if (e.target.dataset.act === 'idle') { if (window.Lock) Lock.askIdle(); bg.remove(); return; }
         if (e.target === bg || e.target.tagName === 'BUTTON') bg.remove();
       });
       document.body.appendChild(bg);
