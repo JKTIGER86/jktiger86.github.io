@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>송금·인보이스 체크</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/owner.js"></script>
+<script src="assets/lock.js"></script>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#ffc531">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="assets/common.js"></script>
+<script src="assets/layout.js"></script>
+<style>
+  .rc-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 20px 0 4px; }
+  .rc-tabs button { border-radius: 999px; padding: 7px 14px; font-size: 13px; }
+  .rc-tabs button.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
+  .rc-tabs .cnt { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 4px; border-radius: 999px; background: var(--card-2); color: var(--sub); font-size: 11px; font-weight: 700; }
+  .rc-tabs button.on .cnt { background: rgba(0,0,0,.12); color: inherit; }
+  .rc-desc { color: var(--sub); font-size: 13px; margin: 8px 0 0; }
+  .rc-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  .rc-tools input[type=search] { height: 34px; border: 1px solid var(--line); border-radius: 8px; background: var(--card-2); padding: 0 10px; min-width: 200px; }
+  .rc-tools label { font-size: 13px; color: var(--sub); display: flex; align-items: center; gap: 4px; }
+  td.wrap { white-space: normal; min-width: 280px; max-width: 420px; word-break: keep-all; overflow-wrap: anywhere; }
+  td .sub { display: block; color: var(--sub); font-size: 12px; }
+  td.plus { color: var(--danger); font-weight: 700; }
+  td.minus { color: var(--down); font-weight: 700; }
+  .old { color: var(--danger); font-weight: 700; }
+  tr.closed td { opacity: .55; }
+  .iss select, .iss input[type=date], .iss input[type=text] { height: 32px; border: 1px solid var(--line); border-radius: 8px; background: var(--card-2); padding: 0 6px; font-size: 13px; }
+  .iss input[type=text] { width: 180px; }
+  .st-todo { border-color: var(--warn) !important; }
+  .st-done, .st-skip { opacity: .8; }
+  .hint { display: block; margin-top: 4px; font-size: 12px; color: var(--ready); white-space: normal; }
+  .hint.maybe { color: var(--accent-strong); }
+  .add-form { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  .add-form input { height: 34px; border: 1px solid var(--line); border-radius: 8px; background: var(--card-2); padding: 0 10px; font-size: 13px; }
+  .loaded { margin-top: 10px; font-size: 13px; color: var(--sub); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>송금·인보이스 체크 🧾</h1>
+    <p>송금영수증 엑셀을 올리면 금액이 안 맞는 건, 도착 확인이 안 된 인보이스, 오래된 미입고를 찾아 드려요. 받을 돈과 문제는 장부에 모아서 끝날 때까지 챙겨요.</p>
+  </header>
+
+  <div class="panel">
+    <ol class="steps">
+      <li><b>2026년 송금영수증.xlsx</b>를 올려요. 첫 번째 시트(총송금금액)만 읽어요.</li>
+      <li><b>점검하기</b>를 누르면 놓치기 쉬운 건들을 탭별로 나눠서 보여 줘요.</li>
+      <li><b>받을 돈·문제 장부</b>에서 하나씩 상태를 정하고, 끝나면 <b>해결됨</b>으로 바꿔요. 사장님 보고용 엑셀도 받을 수 있어요.</li>
+    </ol>
+    <div class="drops" style="margin-top:16px">
+      <div class="drop" id="drop"><b>송금영수증 엑셀</b><small>여기로 끌어다 놓거나 클릭</small><input type="file" accept=".xlsx"></div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="run" disabled>점검하기</button>
+      <button id="download" class="hidden">📥 사장님 보고용 엑셀 받기</button>
+    </div>
+    <div class="loaded" id="loaded"></div>
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <div id="result" class="hidden">
+    <div class="stats" id="stats"></div>
+    <div class="rc-tabs" id="tabs"></div>
+    <p class="rc-desc" id="tabDesc"></p>
+    <div class="rc-tools" id="tools"></div>
+    <div class="table-wrap"><table id="table"></table></div>
+    <form class="add-form hidden" id="addForm">
+      <input type="date" id="addDate" required aria-label="날짜">
+      <input type="text" id="addVendor" placeholder="업체" required maxlength="30" style="width:120px">
+      <input type="number" id="addAmt" placeholder="금액(€)" step="0.01" style="width:110px">
+      <input type="text" id="addText" placeholder="내용 (예: 프라다 지갑 하자, 1장 로스)" required maxlength="120" style="flex:1;min-width:220px">
+      <button class="primary" type="submit">＋ 장부에 직접 추가</button>
+    </form>
+  </div>
+
+  <footer>엑셀 파일은 내 컴퓨터 안에서만 처리돼요. 장부는 이 컴퓨터 크롬에만 저장돼요 · made by 경호 &amp; 루나</footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const { val, str, esc } = Biseo;
+const TOL = 1;            // 1유로 이하 차이는 반올림으로 보고 넘어가요
+const OLD_DAYS = 30;      // 미입고가 이보다 오래되면 빨간색
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const md = s => s ? `${+s.slice(5, 7)}/${+s.slice(8, 10)}` : '';
+const today = new Date(); today.setHours(0, 0, 0, 0);
+const daysSince = s => s ? Math.round((today - new Date(s + 'T00:00:00')) / 86400000) : null;
+const eur = n => n == null ? '' : (n < 0 ? '-' : '') + '€' + Math.abs(n).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const normV = s => String(s || '').replace(/\s+/g, '').replace(/SRL$/i, '').toLowerCase();
+const STATUS = [
+  ['todo', '🟠 확인 필요'], ['reported', '📨 사장님 보고함'], ['credit', '💶 크레딧 받을 것'],
+  ['skip', '🤝 넘어가기로 함'], ['done', '✅ 해결됨'],
+];
+const CLOSED = new Set(['skip', 'done']);
+
+let file = null, data = Store.get('remit.data', null), issues = Store.get('remit.issues', {});
+let tab = 'ledger', showClosed = false, query = '';
+
+Biseo.dropZone($('drop'), f => { file = f; $('run').disabled = false; });
+
+/* ── 엑셀 읽기 ── */
+function toYmd(v) {
+  if (v instanceof Date) return `${v.getUTCFullYear()}-${pad(v.getUTCMonth() + 1)}-${pad(v.getUTCDate())}`;
+  if (typeof v === 'number' && v > 30000 && v < 80000) {
+    const d = new Date(Math.round((v - 25569) * 86400000));
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+  }
+  return '';
+}
+const numOf = v => {
+  if (typeof v === 'number') return v;
+  const s = String(v ?? '').replace(/[€,\s]/g, '');
+  return s !== '' && Number.isFinite(+s) ? +s : null;
+};
+function formulaOf(cell) {
+  try { return cell.formula || (cell.value && cell.value.formula) || ''; } catch { return ''; }
+}
+// 수식 칸 값 읽기. 계산 결과가 0이면 라이브러리가 결과를 비워 두는 경우가 있어서,
+// "F37+F36-O36" 같은 더하기·빼기 수식은 직접 계산해요.
+function cellNum(ws, cell, depth = 0) {
+  const v = cell.value;
+  if (v && typeof v === 'object' && !(v instanceof Date) && ('formula' in v || 'sharedFormula' in v)) {
+    if (typeof v.result === 'number') return v.result;
+    const f = formulaOf(cell).replace(/\s+/g, '');
+    if (depth > 3 || !/^[+-]?\$?[A-Z]+\$?\d+([+-]\$?[A-Z]+\$?\d+)*$/.test(f)) return null;
+    let s = 0;
+    for (const [, sign, ref] of f.matchAll(/([+-]?)(\$?[A-Z]+\$?\d+)/g)) {
+      const n = cellNum(ws, ws.getCell(ref.replace(/\$/g, '')), depth + 1);
+      s += (sign === '-' ? -1 : 1) * (n || 0);
+    }
+    return s;
+  }
+  return numOf(val(cell));
+}
+
+function parse(ws) {
+  // 머리글 줄 찾기 ("일자"가 적힌 줄)
+  let hr = 0, col = {};
+  for (let r = 1; r <= Math.min(15, ws.rowCount) && !hr; r++) {
+    ws.getRow(r).eachCell((cell, c) => { if (str(cell) === '일자') hr = r; });
+  }
+  if (!hr) throw new Error('"일자" 머리글을 못 찾았어요. 첫 번째 시트가 총송금금액 시트가 맞는지 봐 주세요.');
+  ws.getRow(hr).eachCell((cell, c) => {
+    const t = str(cell).replace(/\s+/g, '');
+    if (t === '일자') col.date = c;
+    else if (t.includes('수취인')) col.vendor = c;
+    else if (t.includes('보낸계좌')) col.acct = c;
+    else if (t === '은행') col.bank = c;
+    else if (t.includes('유로')) col.eur = c;
+    else if (t.includes('원화')) col.krw = c;
+    else if (/^[1-6]차$/.test(t)) (col.inv = col.inv || [])[+t[0] - 1] = c;
+    else if (t === '합계') col.sum = c;
+    else if (t.includes('남은')) col.rest = c;
+    else if (t === '결과') col.result = c;
+  });
+  const need = ['date', 'vendor', 'eur', 'sum', 'rest', 'result'];
+  const miss = need.filter(k => !col[k]);
+  if (miss.length || !col.inv) throw new Error('머리글(수취인·송금금액(유로)·1차~6차·합계·남은금액·결과)을 다 찾지 못했어요.');
+  const invCols = col.inv.filter(Boolean);
+  const memoCols = [col.result + 1, col.result + 2];
+
+  const mains = [], deposits = [];
+  let cur = null, lastDate = '';
+  const last = ws.rowCount;
+  for (let r = hr + 1; r <= last; r++) {
+    const row = ws.getRow(r);
+    const d = toYmd(val(row.getCell(col.date)));
+    if (d) lastDate = d;
+    const vendor = str(row.getCell(col.vendor));
+    const result = str(row.getCell(col.result));
+    const F = numOf(val(row.getCell(col.eur)));
+    const invVals = invCols.map(c => val(row.getCell(c)));
+    const hasInvNum = invVals.some(v => numOf(v) != null && typeof v !== 'string');
+    const isDep = /deposit|credit/i.test(vendor);
+    const isMain = !isDep && result && (vendor || hasInvNum || (F && F !== 0));
+
+    if (isMain) {
+      cur = {
+        row: r, date: d || ((F || 0) === 0 ? '' : lastDate), vendor, bank: col.bank ? str(row.getCell(col.bank)) : '',
+        acct: col.acct ? str(row.getCell(col.acct)) : '', eur: F || 0,
+        sum: cellNum(ws, row.getCell(col.sum)) || 0, rest: cellNum(ws, row.getCell(col.rest)),
+        result, memo: [], invoices: [], extras: [], restFormula: formulaOf(row.getCell(col.rest)), end: r,
+      };
+      cur._pending = {};
+      mains.push(cur);
+    }
+    if (!cur) continue;
+    // 이 송금에 딸린 줄 (인보이스 금액 줄, 라벨 줄, DEPOSIT/CREDIT 줄)
+    const blank = !vendor && !hasInvNum && !F && invVals.every(v => v == null || v === '') && memoCols.every(c => !str(row.getCell(c)));
+    if (blank) continue;
+    cur.end = r;
+    if (!isMain && isDep && F) deposits.push({ row: r, main: cur.row, date: cur.date, vendor: cur.vendor, label: vendor, amount: F });
+    if (!isMain && !vendor && F && F !== 0) cur.extras.push({ row: r, amount: F });
+    invCols.forEach((c, i) => {
+      const v = invVals[i];
+      if (v == null || v === '') return;
+      const n = typeof v === 'string' ? null : numOf(v);
+      if (n != null) {
+        const inv = { amount: n, label: '', row: r };
+        cur.invoices.push(inv); cur._pending[i] = inv;
+      } else {
+        const t = String(v).trim();
+        const p = cur._pending[i];
+        if (p && !p.label && /\d/.test(t)) { p.label = t; cur._pending[i] = null; }
+        else cur.memo.push(t);
+      }
+    });
+    memoCols.forEach(c => { const t = str(row.getCell(c)); if (t && !/^-?[\d.,\s€]+$/.test(t)) cur.memo.push(t); });
+  }
+
+  // 다른 송금과 묶인 줄 (남은금액 수식에 다른 줄의 송금액이 들어가 있는 경우)
+  const byRow = new Map(mains.map(m => [m.row, m]));
+  for (const m of mains) {
+    const refs = (m.restFormula.match(/\$?F\$?(\d+)/gi) || []).map(x => +x.replace(/\D/g, ''));
+    m.links = [];
+    for (const rr of refs) {
+      if (rr >= m.row && rr <= m.end) continue;
+      const other = byRow.get(rr);
+      if (other) { other.linkedTo = m.row; m.links.push(rr); }
+    }
+  }
+  // 같은 내용이 두 번 적힌 묶음
+  const sig = new Map();
+  for (const m of mains) {
+    if (!m.invoices.length) continue;
+    const k = [normV(m.vendor), m.eur, m.sum, m.invoices.map(i => i.label + i.amount).join('|')].join('#');
+    if (sig.has(k)) { m.dupOf = sig.get(k); } else sig.set(k, m.row);
+  }
+  for (const m of mains) {
+    delete m._pending;
+    if (!m.vendor) {   // 수취인이 비어 있으면 인보이스 라벨에서 업체 이름을 가져와요
+      const l = m.invoices.find(i => i.label);
+      m.vendor = l ? (l.label.replace(/^\d{1,2}\/\d{1,2}\s*/, '').split(/\s+/)[0] || '') : '';
+      m.vendorGuess = true;
+    }
+    m.memo = [...new Set(m.memo)];
+  }
+  return { mains, deposits, sheet: ws.name };
+}
+
+/* ── 점검 ── */
+function check(m) {
+  const restKnown = m.rest != null ? m.rest : m.eur - m.sum;
+  m.diff = Math.round(restKnown * 100) / 100;
+  m.planned = !m.eur && m.sum > 0;          // 인보이스만 있고 아직 송금 전 (예: 25년 연말에 보낼예정)
+  m.diffBad = !m.linkedTo && !m.planned && Math.abs(m.diff) > TOL;
+  m.ok = /정상입고/.test(m.result);
+  m.wait = /미입고/.test(m.result);
+  m.noDate = m.invoices.filter(i => i.amount > 0 && !/^\s*\d{1,2}\/\d{1,2}/.test(i.label));
+  m.question = m.memo.some(t => t.includes('?'));
+  m.noInv = m.eur > 0 && !m.invoices.length && !m.linkedTo && !m.links.length;
+  m.age = daysSince(m.date);
+  m.key = `${m.date}|${normV(m.vendor)}|${m.eur}|${m.sum}`;
+  return m;
+}
+function candidates() {
+  // 미입고는 물건을 기다리는 중일 수 있어서, 30일이 넘었을 때만 장부에 올려요
+  const late = m => m.wait && (m.age == null || m.age > OLD_DAYS);
+  const list = data.mains.filter(m => m.question || m.dupOf || m.planned
+    || (m.diffBad && (!m.wait || late(m))) || (m.noInv && late(m)));
+  for (const m of list) {
+    if (issues[m.key]) continue;
+    // 처음 올라올 때는 엑셀 메모를 보고 상태를 미리 골라 둬요 (나중에 바꿀 수 있어요)
+    const memo = m.memo.join(' ');
+    const status = /넘어가|무시|맞아|맞다/.test(memo) ? 'skip' : /보고/.test(memo) ? 'reported' : 'todo';
+    issues[m.key] = { status, reported: '', resolved: '', note: status === 'todo' ? '' : '엑셀 메모 보고 미리 골랐어요' };
+  }
+  return list;
+}
+function laterCredits(m) {
+  const v = normV(m.vendor);
+  return data.deposits.filter(d => normV(d.vendor) === v && d.date >= m.date && d.row !== m.row && !(d.main === m.row));
+}
+function reasons(m) {
+  const r = [];
+  if (m.dupOf) r.push(`${m.dupOf}행과 같은 내용이 또 적혀 있어요`);
+  if (m.planned) r.push(`아직 송금 안 한 인보이스 ${eur(m.sum)} (${m.vendor || '보낼 예정'}) — 보냈는지 확인`);
+  if (m.noInv && m.wait) r.push(`송금하고 ${m.age}일째인데 인보이스가 하나도 안 적혀 있어요`);
+  else if (m.diffBad && m.wait) r.push(m.diff > 0 ? `${m.age}일째 미입고 · 아직 ${eur(m.diff)}만큼 안 들어왔어요` : `${m.age}일째 미입고 · 인보이스가 송금보다 ${eur(-m.diff)} 많아요`);
+  else if (m.diffBad) r.push(m.diff > 0 ? `${eur(m.diff)} 더 보냄 → 크레딧 받을 돈?` : `${eur(-m.diff)} 덜 보냄 / 더 들어옴`);
+  if (m.pair) r.push(`${m.pair.row}행 ${m.pair.planned ? '인보이스' : '송금'}(${eur(m.pair.planned ? m.pair.sum : m.pair.eur)})과 금액이 같아요 — 같은 건이면 묶어서 보세요`);
+  if (m.question) r.push('메모에 물음표(?)가 있어요');
+  return r;
+}
+
+/* ── 화면 ── */
+const TABS = [
+  ['ledger', '📒 받을 돈·문제 장부', '금액이 안 맞거나 물음표가 남은 건을 모았어요. 상태를 정해 두면 이 컴퓨터에 저장돼요. 해결됨·넘어가기로 함은 끝난 걸로 봐요.'],
+  ['okdiff', '⚠️ 정상입고인데 금액 차이', '결과는 "정상입고"인데 남은금액이 1유로 넘게 차이 나요. 여기서 가장 많이 놓쳐요.'],
+  ['nodate', '📦 도착일 없는 인보이스', '결과는 "정상입고"인데 도착일이 안 적힌 인보이스가 있어요. 진짜 들어왔는지 확인해 주세요.'],
+  ['wait', '⏳ 미입고', '아직 미입고인 송금이에요. 오래된 것부터 보여 줘요. 30일 넘은 건 빨간색이에요.'],
+  ['linked', '🔗 나눠 보낸 송금', '남은금액 수식이 다른 줄 송금액까지 합쳐서 계산하는 건이에요. 이 줄들의 남은금액은 따로 보지 않아도 돼요.'],
+  ['all', '📋 전체', '모든 송금이에요. 업체 이름이나 인보이스 번호로 찾을 수 있어요.'],
+];
+function counts() {
+  const ms = data.mains;
+  const cands = candidates();
+  return {
+    ledger: cands.filter(m => !CLOSED.has(issues[m.key].status)).length + manualIssues().filter(i => !CLOSED.has(i.status)).length,
+    okdiff: ms.filter(m => m.ok && m.diffBad).length,
+    nodate: ms.filter(m => m.ok && m.noDate.length).length,
+    wait: ms.filter(m => m.wait).length,
+    linked: ms.filter(m => m.linkedTo || m.links.length).length,
+    all: ms.length,
+  };
+}
+const manualIssues = () => Object.entries(issues).filter(([k]) => k.startsWith('m|')).map(([k, v]) => ({ key: k, ...v }));
+
+function render() {
+  if (!data) return;
+  data.mains.forEach(check);
+  // 인보이스 없는 송금 ↔ 송금 안 된 인보이스 묶음: 금액이 같으면 짝으로 알려 줘요
+  data.mains.forEach(m => { m.pair = null; });
+  const planned = data.mains.filter(m => m.planned && !m.dupOf);
+  for (const m of data.mains.filter(x => x.noInv)) {
+    const p = planned.find(x => !x.pair && Math.abs(x.sum - m.eur) <= TOL);
+    if (p) { m.pair = p; p.pair = m; }
+  }
+  const c = counts();
+  saveIssues(c.ledger);
+  $('result').classList.remove('hidden');
+  const total = data.mains.reduce((s, m) => s + (m.eur || 0), 0);
+  const waitOld = data.mains.filter(m => m.wait && m.age > OLD_DAYS).length;
+  $('stats').innerHTML = [
+    ['송금 건수', data.mains.length + '건'], ['총 송금액', eur(total)],
+    ['장부에 안 끝난 일', c.ledger + '건'], ['정상입고인데 금액 차이', c.okdiff + '건'],
+    ['도착일 없는 인보이스', c.nodate + '건'], [`${OLD_DAYS}일 넘은 미입고`, waitOld + '건'],
+  ].map(([k, v]) => `<div class="stat"><span>${k}</span><b>${v}</b></div>`).join('');
+  $('tabs').innerHTML = TABS.map(([k, name]) => `<button type="button" data-t="${k}" class="${k === tab ? 'on' : ''}">${name}<span class="cnt">${c[k]}</span></button>`).join('');
+  $('tabDesc').textContent = TABS.find(t => t[0] === tab)[2];
+  $('tools').innerHTML = (tab === 'ledger' ? `<label><input type="checkbox" id="showClosed" ${showClosed ? 'checked' : ''}> 끝난 것도 보기</label>` : '') +
+    `<input type="search" id="q" placeholder="업체·인보이스 번호·메모 찾기" value="${esc(query)}">`;
+  $('addForm').classList.toggle('hidden', tab !== 'ledger');
+  $('table').innerHTML = tab === 'ledger' ? ledgerHTML() : listHTML();
+}
+
+const match = m => !query || [m.vendor, m.memo.join(' '), m.invoices.map(i => i.label).join(' '), m.row, m.result].join(' ').toLowerCase().includes(query.toLowerCase());
+const invText = m => m.invoices.map(i => `${i.label || '(라벨 없음)'} ${eur(i.amount)}`).join(' · ');
+const diffCell = m => m.planned ? '<td class="num"><span class="sub">송금 전</span></td>'
+  : `<td class="num ${m.linkedTo ? '' : m.diff > TOL ? 'plus' : m.diff < -TOL ? 'minus' : ''}">${m.linkedTo ? `<span class="sub">${m.linkedTo}행과 묶음</span>` : eur(m.diff)}</td>`;
+
+function listHTML() {
+  let ms = data.mains.filter(match);
+  if (tab === 'okdiff') ms = ms.filter(m => m.ok && m.diffBad);
+  if (tab === 'nodate') ms = ms.filter(m => m.ok && m.noDate.length);
+  if (tab === 'wait') ms = ms.filter(m => m.wait).sort((a, b) => (a.date < b.date ? -1 : 1));
+  if (tab === 'linked') ms = ms.filter(m => m.linkedTo || m.links.length);
+  if (!ms.length) return '<tr><td class="empty-note">해당하는 송금이 없어요 🎉</td></tr>';
+  const head = '<tr><th>엑셀 행</th><th>송금일</th><th>업체</th><th class="num">송금액</th><th class="num">인보이스 합</th><th class="num">남은금액</th><th>결과</th><th>' +
+    (tab === 'nodate' ? '도착일 없는 인보이스' : tab === 'linked' ? '묶인 줄' : '인보이스') + '</th><th>메모</th></tr>';
+  return head + ms.map(m => {
+    const age = m.wait && m.age != null ? `<span class="sub ${m.age > OLD_DAYS ? 'old' : ''}">${m.age}일째</span>` : '';
+    const third = tab === 'nodate' ? m.noDate.map(i => `${esc(i.label || '(라벨 없음)')} ${eur(i.amount)}`).join('<br>')
+      : tab === 'linked' ? (m.linkedTo ? `${m.linkedTo}행 수식에 포함돼요` : `${m.links.join(', ')}행 송금액을 같이 계산해요`)
+      : esc(invText(m));
+    return `<tr><td>${m.row}</td><td>${md(m.date)}${age}</td><td>${esc(m.vendor)}${m.vendorGuess ? '<span class="sub">(수취인 칸 비어 있음)</span>' : ''}</td>
+      <td class="num">${eur(m.eur)}</td><td class="num">${eur(m.sum)}</td>${diffCell(m)}<td>${esc(m.result)}</td>
+      <td class="wrap">${third}</td><td class="wrap">${esc(m.memo.join(' / '))}</td></tr>`;
+  }).join('');
+}
+
+function statusSel(key, st) {
+  return `<select data-k="${esc(key)}" data-f="status" class="st-${st}">${STATUS.map(([v, n]) => `<option value="${v}" ${v === st ? 'selected' : ''}>${n}</option>`).join('')}</select>`;
+}
+function ledgerHTML() {
+  const cands = candidates().filter(match);
+  const rows = [];
+  for (const m of cands) {
+    const is = issues[m.key];
+    if (!showClosed && CLOSED.has(is.status)) continue;
+    const cr = laterCredits(m);
+    const exact = cr.find(d => m.diffBad && Math.abs(d.amount - Math.abs(m.diff)) <= TOL);
+    const hint = exact ? `<span class="hint">✅ ${md(exact.date)} 송금에 ${esc(exact.label)} ${eur(exact.amount)}가 들어왔어요 (${exact.row}행). 맞으면 해결됨으로 바꿔 주세요.</span>`
+      : cr.length && m.diff > TOL ? `<span class="hint maybe">💡 이후 같은 업체 크레딧: ${cr.map(d => `${md(d.date)} ${eur(d.amount)}`).join(', ')}</span>` : '';
+    rows.push({ sortDate: m.date || '9999', html: `<tr class="iss ${CLOSED.has(is.status) ? 'closed' : ''}"><td>${m.row}</td><td>${m.date ? `${md(m.date)}<span class="sub">${m.age}일 전</span>` : '<span class="sub">날짜 없음</span>'}</td>
+      <td>${esc(m.vendor)}</td>${diffCell(m)}<td class="wrap">${reasons(m).map(esc).join('<br>')}<span class="sub">${esc(m.memo.join(' / '))}</span>${hint}</td>
+      <td>${statusSel(m.key, is.status)}</td><td><input type="date" data-k="${esc(m.key)}" data-f="reported" value="${is.reported}" aria-label="보고일"></td>
+      <td><input type="date" data-k="${esc(m.key)}" data-f="resolved" value="${is.resolved}" aria-label="해결일"></td>
+      <td><input type="text" data-k="${esc(m.key)}" data-f="note" value="${esc(is.note)}" placeholder="사장님 결정, 다음 할 일" maxlength="120"></td></tr>` });
+  }
+  for (const it of manualIssues()) {
+    if (!showClosed && CLOSED.has(it.status)) continue;
+    if (query && !(it.vendor + it.text).toLowerCase().includes(query.toLowerCase())) continue;
+    rows.push({ sortDate: it.date, html: `<tr class="iss ${CLOSED.has(it.status) ? 'closed' : ''}"><td><span class="sub">직접 추가</span></td><td>${md(it.date)}<span class="sub">${daysSince(it.date)}일 전</span></td>
+      <td>${esc(it.vendor)}</td><td class="num">${it.amount != null && it.amount !== '' ? eur(+it.amount) : ''}</td><td class="wrap">${esc(it.text)}
+      <button type="button" data-del="${esc(it.key)}" style="padding:2px 8px;font-size:12px;margin-left:6px">지우기</button></td>
+      <td>${statusSel(it.key, it.status)}</td><td><input type="date" data-k="${esc(it.key)}" data-f="reported" value="${it.reported || ''}"></td>
+      <td><input type="date" data-k="${esc(it.key)}" data-f="resolved" value="${it.resolved || ''}"></td>
+      <td><input type="text" data-k="${esc(it.key)}" data-f="note" value="${esc(it.note || '')}" placeholder="사장님 결정, 다음 할 일" maxlength="120"></td></tr>` });
+  }
+  if (!rows.length) return `<tr><td class="empty-note">${showClosed ? '장부가 비어 있어요.' : '안 끝난 일이 없어요! 🎉'}</td></tr>`;
+  rows.sort((a, b) => (a.sortDate < b.sortDate ? -1 : 1));
+  return '<tr><th>엑셀 행</th><th>날짜</th><th>업체</th><th class="num">차이</th><th>왜 장부에 올라왔나요</th><th>상태</th><th>보고일</th><th>해결일</th><th>메모</th></tr>' + rows.map(r => r.html).join('');
+}
+
+function saveIssues(openCount) {
+  Store.set('remit.issues', issues);
+  if (openCount != null) Store.set('remit.open', { n: openCount, at: ymd(new Date()) });
+}
+
+/* ── 이벤트 ── */
+$('run').addEventListener('click', async () => {
+  $('run').disabled = true;
+  Biseo.message($('msg'), '읽는 중이에요… 잠시만요.', 'ok');
+  try {
+    const wb = await Biseo.readFile(file);
+    const ws = wb.worksheets.find(w => w.state !== 'hidden') || wb.worksheets[0];
+    const parsed = parse(ws);
+    if (!parsed.mains.length) throw new Error('송금 줄을 하나도 못 찾았어요.');
+    data = { ...parsed, file: file.name, at: new Date().toLocaleString('ko-KR') };
+    Store.set('remit.data', data);
+    tab = 'ledger';
+    render(); showLoaded();
+    Biseo.message($('msg'), `다 읽었어요! "${parsed.sheet}" 시트에서 송금 ${parsed.mains.length}건을 점검했어요.`, 'ok');
+    $('download').classList.remove('hidden');
+  } catch (e) {
+    console.error(e);
+    Biseo.message($('msg'), '파일을 읽다가 문제가 생겼어요: ' + e.message, 'err');
+  }
+  $('run').disabled = false;
+});
+
+$('tabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-t]'); if (!b) return;
+  tab = b.dataset.t; render();
+});
+$('tools').addEventListener('input', e => {
+  if (e.target.id === 'q') { query = e.target.value; const pos = e.target.selectionStart; render(); const q = $('q'); q.focus(); q.setSelectionRange(pos, pos); }
+});
+$('tools').addEventListener('change', e => { if (e.target.id === 'showClosed') { showClosed = e.target.checked; render(); } });
+$('table').addEventListener('change', e => {
+  const k = e.target.dataset.k, f = e.target.dataset.f; if (!k || !f) return;
+  issues[k] = { ...(issues[k] || {}), [f]: e.target.value };
+  if (f === 'status' && e.target.value === 'done' && !issues[k].resolved) issues[k].resolved = ymd(new Date());
+  if (f === 'status' && e.target.value === 'reported' && !issues[k].reported) issues[k].reported = ymd(new Date());
+  saveIssues();
+  if (f === 'status' || f === 'resolved') render(); else saveIssues(counts().ledger);
+});
+$('table').addEventListener('click', e => {
+  const k = e.target.dataset.del; if (!k) return;
+  if (!confirm('이 항목을 장부에서 지울까요?')) return;
+  delete issues[k]; saveIssues(); render();
+});
+$('addForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const key = 'm|' + Date.now().toString(36);
+  issues[key] = { status: 'todo', reported: '', resolved: '', note: '', date: $('addDate').value, vendor: $('addVendor').value.trim(),
+    amount: $('addAmt').value, text: $('addText').value.trim() };
+  $('addVendor').value = ''; $('addAmt').value = ''; $('addText').value = '';
+  saveIssues(); render();
+});
+$('addDate').value = ymd(new Date());
+
+$('download').addEventListener('click', async () => {
+  $('download').disabled = true;
+  try {
+    const wb = new ExcelJS.Workbook();
+    const ws1 = wb.addWorksheet('받을 돈·문제 장부');
+    Biseo.styleTable(ws1, ['엑셀 행', '송금일', '업체', '차이(€)', '내용', '엑셀 메모', '상태', '보고일', '해결일', '메모'], [8, 11, 14, 12, 40, 40, 16, 11, 11, 30]);
+    const stName = s => (STATUS.find(x => x[0] === s) || ['', s])[1].replace(/^\S+\s/, '');
+    for (const m of candidates()) {
+      const is = issues[m.key];
+      ws1.addRow([m.row, m.date, m.vendor, m.diffBad ? m.diff : null, reasons(m).join(' / '), m.memo.join(' / '), stName(is.status), is.reported, is.resolved, is.note]);
+    }
+    for (const it of manualIssues()) ws1.addRow(['직접 추가', it.date, it.vendor, it.amount === '' ? null : +it.amount, it.text, '', stName(it.status), it.reported, it.resolved, it.note]);
+    ws1.getColumn(4).numFmt = '#,##0.00';
+    Biseo.borderAll(ws1);
+
+    const ws2 = wb.addWorksheet('점검 결과');
+    Biseo.styleTable(ws2, ['구분', '엑셀 행', '송금일', '업체', '송금액(€)', '인보이스 합(€)', '남은금액(€)', '결과', '내용', '메모'], [24, 8, 11, 14, 13, 13, 12, 10, 50, 40]);
+    const add = (kind, m, extra) => ws2.addRow([kind, m.row, m.date, m.vendor, m.eur, m.sum, m.linkedTo ? null : m.diff, m.result, extra, m.memo.join(' / ')]);
+    data.mains.filter(m => m.ok && m.diffBad).forEach(m => add('정상입고인데 금액 차이', m, invText(m)));
+    data.mains.filter(m => m.ok && m.noDate.length).forEach(m => add('도착일 없는 인보이스', m, m.noDate.map(i => `${i.label || '(라벨 없음)'} ${i.amount}`).join(' · ')));
+    data.mains.filter(m => m.wait).sort((a, b) => (a.date < b.date ? -1 : 1)).forEach(m => add('미입고', m, `${m.age}일째`));
+    [5, 6, 7].forEach(i => { ws2.getColumn(i).numFmt = '#,##0.00'; });
+    Biseo.borderAll(ws2);
+    await Biseo.save(wb, `송금점검_${ymd(new Date()).replace(/-/g, '')}.xlsx`);
+  } catch (e) { Biseo.message($('msg'), '저장하다가 문제가 생겼어요: ' + e.message, 'err'); }
+  $('download').disabled = false;
+});
+
+function showLoaded() {
+  $('loaded').textContent = data ? `마지막으로 읽은 파일: ${data.file} (${data.at}) · 새로 고친 엑셀이 있으면 다시 올려 주세요.` : '';
+}
+if (data) { showLoaded(); render(); $('download').classList.remove('hidden'); }
+</script>
+</body>
+</html>

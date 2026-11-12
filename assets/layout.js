@@ -3,6 +3,8 @@
  * 새 도구를 만들면 아래 TOOLS 에 한 줄만 추가하면 메뉴·검색·대시보드에 자동으로 나와요.
  */
 const TOOLS = [
+  { href: 'remit-check.html', icon: '🧾', name: '송금·인보이스 체크', group: '송금·인보이스', ready: true,
+    desc: '송금영수증에서 금액 차이·도착 미확인·오래된 미입고를 찾고, 받을 돈 장부로 끝까지 챙겨요.' },
   { href: 'price-compare.html', icon: '💸', name: '엑셀 가격 비교', group: '행사 리스트', ready: true,
     desc: '이전/새 파일을 비교해서 바뀐 가격을 노란색으로 표시해요.' },
   { href: 'rep-list.html', icon: '⭐', name: '대표 품번 모으기', group: '행사 리스트', ready: true,
